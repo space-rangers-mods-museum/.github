@@ -1,0 +1,25 @@
+exhibit: LEOGraphicsMod
+
+# internal — input for extract_exhibit.py, NOT shown on the card
+source:
+  kind: zip
+  path: C:/Users/ringill/repo/space_rangers/tmp/Solyanka.zip
+  target: Mods/Solyanka/LEOGraphicsMod
+
+# public — acquisition route, rendered in the card README.md
+acquire:
+  - ref: https://steamcommunity.com/sharedfiles/filedetails/?id=851524240
+    note: "[2026] Модификации | Universe и другие мод-паки"
+    date: 2026-08-01
+  - ref: https://discord.com/invite/pgnVGHvnYc
+    note: Space Rangers Mods
+    date:
+  - ref: https://discord.gg/vbnm6uDnH
+    note: "# скачать моды"
+    date:
+  - ref: https://discord.com/channels/674954439748222996/711519841366048788/1151473314288631828
+    note: Солянка
+    date: 2023-09-13
+  - ref: https://drive.google.com/file/d/1fJxS-m0P8fGS9hYF80vIJu7XdTMYF8IP/edit
+    note: Solyanka.zip; 522Mb
+    date: 2022-08-20

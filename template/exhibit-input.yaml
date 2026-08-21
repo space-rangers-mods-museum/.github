@@ -1,0 +1,22 @@
+# Empty YAML template for an exhibit. Copy to exhibits/<exhibit>.yaml and fill in.
+# Schema in design.md, section "Input: YAML per exhibit".
+
+exhibit: <id>   # id = mod repo folder in the museum
+
+# internal — input for extract_exhibit.py, NOT shown on the card
+source:
+  kind: zip                         # first implementation — zip only
+  path: <source>                    # google disk link (downloads it and extracts) OR path to an existing local file (extracts without downloading); relative paths resolve against this file's folder
+  target: <mod folder path inside the source>   # e.g. Mods/Solyanka/LEOGraphicsMod
+
+# public — acquisition route, rendered in the card README.md
+# chain from the start point down to the local file; ref/note/date fields are always
+# present but may be left empty; note — English, except verbatim resource names
+# (Discord channels, collection/mod-pack titles), which stay in their original spelling
+acquire:
+  - ref: <url>            # working link for this step
+    note: <step description>  # English, except verbatim resource names; values starting with # go in quotes ("#tag")
+    date: YYYY-MM-DD      # discord post date / file date (may be left empty)
+  - ref: <url>
+    note: <step description>
+    date: YYYY-MM-DD
