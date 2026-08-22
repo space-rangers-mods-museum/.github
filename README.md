@@ -25,3 +25,4 @@ The full step-by-step workflow and tooling are documented in [workflow.md](workf
 | Mod | Author | Exhibit | Summary |
 |-----|--------|---------|---------|
 | AMod_Spacejunk | Huk | [AMod_Spacejunk](https://github.com/space-rangers-mods-museum/AMod_Spacejunk) | На форме космоса добавляется панелька-смотрелка, показывающая какой предмет и где лежит в системе |
+| LEOGraphicsMod | LEOPARD | [LEOGraphicsMod](https://github.com/space-rangers-mods-museum/LEOGraphicsMod) | Содержит в себе всю графику и звук из "Солянки" и "AnotherMods" --- |
