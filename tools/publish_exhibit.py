@@ -17,7 +17,8 @@ a log line for every step and stopping on the first failed step:
   6. update the showcase locally (``update_showcase.py``: append the exhibit
      to ``exhibits.csv`` and rebuild the showcase main page in ``.github``) —
      local, safe, not yet pushed;
-  7. publish the repository through ``gh`` (repo create + push);
+  7. publish the repository through ``gh`` (repo create + push, description
+     set from ``ModuleInfo.txt``'s short description);
   8. publish the final archive as a GitHub release (``gh release create``,
      version always ``v1.0.0``, title = exhibit name) and delete the local
      ``.zip`` — it now lives as the release asset only;
@@ -50,8 +51,10 @@ from pathlib import Path
 
 import yaml
 
+from generate_card import first_field, read_module_info
+
 TOOL_NAME = "publish_exhibit.py"
-TOOL_VERSION = "1.2.0"
+TOOL_VERSION = "1.3.0"
 DEFAULT_ORG = "space-rangers-mods-museum"
 RELEASE_VERSION = "v1.0.0"  # archive versioning is out of scope — always v1.0.0
 
@@ -223,12 +226,17 @@ def main() -> None:
         print("no-publish: stopped after local git repo + showcase local update — gh publish step skipped")
         return
 
-    # 7. Publish the repository through gh.
-    run_step(
-        log_path,
-        "gh-create-repo",
-        ["gh", "repo", "create", f"{args.org}/{exhibit}", "--public", "--source", str(out_dir), "--push"],
-    )
+    # 7. Publish the repository through gh. The exhibit summary comes from
+    #    ``ModuleInfo.txt`` inside the archive (the single source the card is
+    #    built from — same ``generate_card`` parsing), and becomes the repo
+    #    description, so the new repo is not an empty "No description"
+    #    placeholder. GitHub caps descriptions at 350 chars, so the summary is
+    #    truncated to fit.
+    summary = first_field(read_module_info(out_dir / f"{exhibit}.zip"), "SmallDescriptionEng", "SmallDescription")
+    create_cmd = ["gh", "repo", "create", f"{args.org}/{exhibit}", "--public", "--source", str(out_dir), "--push"]
+    if summary:
+        create_cmd += ["--description", summary[:350]]
+    run_step(log_path, "gh-create-repo", create_cmd)
 
     # 8. Publish the archive as a release (version always v1.0.0, title = exhibit).
     #    ``--repo`` pins the release to the exhibit repo: without it ``gh`` targets
