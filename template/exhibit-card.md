@@ -1,21 +1,17 @@
 # 🏛️ {{EXHIBIT}}
 
-> **Museum catalog:** `space-rangers-mods-museum`
-> **Status:** 📦 preserved original (kept as-is)
+## 📝 Mod
 
----
+* **Name:** {{EXHIBIT}}
+* **Author:** {{AUTHOR}}
 
-## 📝 Exhibit
-
-* **Exhibit:** `{{EXHIBIT}}`
-* **Author:** {{AUTHOR}} *(from ModuleInfo.txt)*
-* **Status:** 📦 preserved original
-
----
-
-## 🛠️ Description
+### Summary
 
 {{SHORT_DESCRIPTION}}
+
+---
+
+## 📖 Description
 
 {{FULL_DESCRIPTION}}
 
@@ -25,14 +21,14 @@
 
 An ordered chain of steps — from the starting point down to the local archive; every step is reproducible:
 
+```yaml
 {{ACQUIRE}}
+```
 
 ---
 
-## 📁 Exhibit files
+## 📁 Mod files
 
-| file | SHA-256 |
-|------|---------|
 {{FILES}}
 
 > Final archive: `{{ARCHIVE_PATH}}` · SHA-256 `{{ARCHIVE_SHA}}`
@@ -41,5 +37,4 @@ An ordered chain of steps — from the starting point down to the local archive;
 
 ## ⚖️ Copyright & Disclaimer
 
-**All Rights Reserved:** the author of this modification is **{{AUTHOR}}** (from `ModuleInfo.txt`).
-`space-rangers-mods-museum` does not claim authorship; the material is published solely for digital archaeology, preserving the history of the gaming community, and educational purposes (Fair Use).
+**All Rights Reserved:** the authorship of this modification fully belongs to the developer **{{AUTHOR}}** (per `ModuleInfo.txt`). This publication is made solely for digital archaeology, preserving the history of the gaming community, and educational purposes (Fair Use), without any claim to the original copyright.

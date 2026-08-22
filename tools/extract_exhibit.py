@@ -35,7 +35,6 @@ import shutil
 import subprocess
 import tempfile
 import zipfile
-from datetime import datetime
 from pathlib import Path
 
 TOOL_NAME = "extract_exhibit.py"
@@ -144,16 +143,13 @@ def build_exhibit(
     # 6. Write the manifest (archive hash + per-file hashes + source info).
     archive_sha = sha256_of(out_zip)
     manifest = {
-        "exhibit": exhibit,
-        "built": datetime.now().date().isoformat(),
-        "tool": TOOL_NAME,
-        "tool_version": TOOL_VERSION,
+        "exhibit_name": exhibit,
         "source": {
             "archive": source.name,
             "size": source.stat().st_size,
             "sha256": source_sha,
         },
-        "archive": {
+        "exhibit_archive": {
             "path": out_zip.name,
             "size": out_zip.stat().st_size,
             "sha256": archive_sha,
@@ -196,11 +192,11 @@ def main() -> None:
         raise SystemExit(1)
 
     print(
-        f"{manifest['exhibit']}: {manifest['archive']['path']} "
-        f"({manifest['archive']['entries']} files, {manifest['archive']['size']} bytes)"
+        f"{manifest['exhibit_name']}: {manifest['exhibit_archive']['path']} "
+        f"({manifest['exhibit_archive']['entries']} files, {manifest['exhibit_archive']['size']} bytes)"
     )
-    print(f"  SHA-256: {manifest['archive']['sha256']}")
-    print(f"  manifest: {Path(args.out_dir) / (manifest['exhibit'] + '.manifest.json')}")
+    print(f"  SHA-256: {manifest['exhibit_archive']['sha256']}")
+    print(f"  manifest: {Path(args.out_dir) / (manifest['exhibit_name'] + '.manifest.json')}")
 
 
 if __name__ == "__main__":
