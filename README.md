@@ -16,7 +16,7 @@ Every exhibit is processed through the same deterministic pipeline, so any two r
 
 - The mod's files are unpacked from their source archive and repacked into a single exhibit archive, keyed by content (SHA-256) rather than file dates.
 - A manifest and a generated card (`README.md`) are produced from the mod's own `ModuleInfo.txt`, so author, summary, and file listing are never hand-typed.
-- The exhibit is registered in this catalog (`.csv`) and the page you are reading is rebuilt from it.
+- The exhibit is registered in this catalog ([`exhibits.csv`](exhibits.csv)) and the page you are reading is rebuilt from it.
 
 The full step-by-step workflow and tooling are documented in [workflow.md](workflow.md).
 
