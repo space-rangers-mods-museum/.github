@@ -2,11 +2,11 @@
 
 What this does
 --------------
-Runs separately from the publish chain — the orchestrator never calls it. After
-an exhibit repository exists, this tool records it in the museum mod list
-``exhibits.csv`` (one row per exhibit) and rebuilds the showcase main page
-``README.md`` from that ``.csv``: the ``.csv`` is the single source of the
-catalog, the page is generated from it and never hand-edited.
+Records an exhibit in the museum mod list ``exhibits.csv`` (one row per exhibit)
+and rebuilds the showcase main page ``README.md`` from that ``.csv``: the
+``.csv`` is the single source of the catalog, the page is generated from it and
+never hand-edited. Called by the ``publish_exhibit.py`` orchestrator as the
+showcase-local step, or directly for a standalone update.
 
 The row columns (in order) are ``mod_name``, ``mod_museum_repo_name``,
 ``mod_museum_repo_link``. If the repository name is already present in the

@@ -10,23 +10,30 @@ a log line for every step and stopping on the first failed step:
   2. extract and repack the mod folder (``extract_exhibit.py``);
   3. generate the card README (``generate_card.py``);
   4. form the local repository folder (card + a copy of the exhibit YAML +
-     manifest; the archive is excluded via ``.gitignore`` — it is a release
-     asset, not a source file in the repo);
-  5. publish the repository through ``gh`` (repo create + push);
-  6. publish the final archive as a GitHub release (``gh release create``,
+     manifest + a generated ``.gitignore`` that excludes ``.zip`` and ``.log``
+     — the archive is a release asset, not a source file in the repo);
+  5. initialize the local git repository (``git init`` + initial commit) — a
+     purely local, safe step, so the later ``gh`` push has something to push;
+  6. update the showcase locally (``update_showcase.py``: append the exhibit
+     to ``exhibits.csv`` and rebuild the showcase main page in ``.github``) —
+     local, safe, not yet pushed;
+  7. publish the repository through ``gh`` (repo create + push);
+  8. publish the final archive as a GitHub release (``gh release create``,
      version always ``v1.0.0``, title = exhibit name) and delete the local
-     ``.zip`` — it now lives as the release asset only.
+     ``.zip`` — it now lives as the release asset only;
+  9. commit & push the showcase changes (``git add/commit/push`` in ``.github``)
+     — only after step 7 succeeded, so the pushed page links to a live repo.
 
-Pass ``--no-publish`` to run steps 1-5 only (extract -> card -> repo-folder
-check) without touching ``gh`` or the git repository — useful for a local
-verification run.
+Pass ``--no-publish`` to run steps 1-6 only (extract -> card -> repo-folder ->
+local git init -> showcase local update) without touching ``gh`` or the remote —
+useful for a local verification run.
 
 Usage
 -----
     python publish_exhibit.py exhibits/LEOGraphicsMod.yaml \
         --out-dir ../../LEOGraphicsMod
 
-    # local-only run (no gh, no git):
+    # local-only run (no gh, no remote):
     python publish_exhibit.py exhibits/LEOGraphicsMod.yaml \
         --out-dir ./build --no-publish
 """
@@ -44,11 +51,12 @@ from pathlib import Path
 import yaml
 
 TOOL_NAME = "publish_exhibit.py"
-TOOL_VERSION = "1.0.0"
+TOOL_VERSION = "1.2.0"
 DEFAULT_ORG = "space-rangers-mods-museum"
 RELEASE_VERSION = "v1.0.0"  # archive versioning is out of scope — always v1.0.0
 
 TOOLS_DIR = Path(__file__).resolve().parent
+SHOWCASE_DIR = TOOLS_DIR.parent  # museum/.github — the showcase repo local working copy
 
 
 class StepFailed(RuntimeError):
@@ -113,7 +121,7 @@ def main() -> None:
     parser.add_argument("yaml_path", help="path to the exhibit YAML")
     parser.add_argument("--out-dir", help="local repository folder for the exhibit (default: <museum working dir>/<exhibit>, flat next to .github)")
     parser.add_argument("--org", default=DEFAULT_ORG, help=f"museum org (default: {DEFAULT_ORG})")
-    parser.add_argument("--no-publish", action="store_true", help="run extract -> card -> folder only (no gh, no git)")
+    parser.add_argument("--no-publish", action="store_true", help="run extract -> card -> repo folder -> local git init -> showcase local update only (no gh, no remote, no showcase push)")
     parser.add_argument("--log", help="path to the pipeline log file (default: <out-dir>/publish.log)")
     args = parser.parse_args()
 
@@ -171,13 +179,18 @@ def main() -> None:
         ],
     )
 
-    # 4. Copy the exhibit YAML into the repo folder — it records where the
-    #    instance came from and lives with the exhibit.
+    # 4. Form the local repository folder — the source files of the exhibit.
+    #    Copy the exhibit YAML in first: it records where the instance came from
+    #    and lives with the exhibit.
     shutil.copy2(args.yaml_path, out_dir / Path(args.yaml_path).name)
 
-    # 5. Local repository folder — the source files of the exhibit. The archive
-    #    is intentionally NOT part of it: it ships as a release asset instead.
-    required = ["README.md", Path(args.yaml_path).name, f"{exhibit}.manifest.json"]
+    #    The archive is intentionally NOT part of the folder: it ships as a
+    #    release asset instead, so ``.zip`` is excluded; the pipeline log
+    #    (``.log``) is too. The .gitignore is generated here so it is part of
+    #    the repo folder.
+    (out_dir / ".gitignore").write_text("*.zip\n*.log\n", encoding="utf-8")
+
+    required = ["README.md", Path(args.yaml_path).name, f"{exhibit}.manifest.json", ".gitignore"]
     missing = [name for name in required if not (out_dir / name).exists()]
     if missing:
         log_write(log_path, f"FAIL repo-folder: missing {missing}")
@@ -186,32 +199,66 @@ def main() -> None:
     print(f"[repo-folder] {out_dir}")
     shutil.rmtree(work_dir, ignore_errors=True)
 
+    # 5. Local git repository — safe, purely local step: initialize the repo
+    #    and make the initial commit, so the later ``gh repo create --push``
+    #    (step 7) has something to push. The archive stays excluded by the
+    #    generated ``.gitignore``.
+    run_step(log_path, "git-init", ["git", "-C", str(out_dir), "init"])
+    run_step(log_path, "git-add", ["git", "-C", str(out_dir), "add", "-A"])
+    run_step(log_path, "git-commit", ["git", "-C", str(out_dir), "commit", "-m", f"Add {exhibit} exhibit"])
+
+    # 6. Showcase — local update. Safe, local step: append the exhibit to the
+    #    museum mod list ``exhibits.csv`` and rebuild the showcase main page in
+    #    ``museum/.github`` — nothing is pushed yet. The pushed page (step 9)
+    #    will link to the exhibit repo, which only exists after step 7.
+    run_step(
+        log_path,
+        "showcase-local",
+        [sys.executable, str(TOOLS_DIR / "update_showcase.py"), "--exhibit", exhibit],
+    )
+
     if args.no_publish:
-        log_write(log_path, "DONE (no-publish): chain stopped after repo-folder")
-        print("no-publish: stopped after repo-folder — gh/git steps skipped")
+        log_write(log_path, "DONE (no-publish): chain stopped after local git repo + showcase local update")
+        print("no-publish: stopped after local git repo + showcase local update — gh publish step skipped")
         return
 
-    # Keep the archive and the pipeline log out of the git repo — the archive is
-    # published as a release asset, not committed as a source file.
-    (out_dir / ".gitignore").write_text("*.zip\npublish.log\n", encoding="utf-8")
-
-    # 6. Publish the repository through gh.
+    # 7. Publish the repository through gh.
     run_step(
         log_path,
         "gh-create-repo",
         ["gh", "repo", "create", f"{args.org}/{exhibit}", "--public", "--source", str(out_dir), "--push"],
     )
 
-    # 7. Publish the archive as a release (version always v1.0.0, title = exhibit).
+    # 8. Publish the archive as a release (version always v1.0.0, title = exhibit).
+    #    ``--repo`` pins the release to the exhibit repo: without it ``gh`` targets
+    #    the repo of the current directory, which for this tool is the showcase
+    #    ``.github`` working copy — the archive would ship to the wrong repo.
     run_step(
         log_path,
         "gh-release",
-        ["gh", "release", "create", RELEASE_VERSION, "--title", exhibit, str(out_dir / f"{exhibit}.zip")],
+        ["gh", "release", "create", RELEASE_VERSION, "--repo", f"{args.org}/{exhibit}", "--title", exhibit, str(out_dir / f"{exhibit}.zip")],
     )
 
-    # 8. The archive now lives as the GitHub release asset — remove the local
+    #    The archive now lives as the GitHub release asset — remove the local
     #    copy so it does not linger in the repo folder as a source file.
     (out_dir / f"{exhibit}.zip").unlink(missing_ok=True)
+
+    # 9. Showcase — commit & push. Side-effect step: the updated ``exhibits.csv``
+    #    and main page (step 6) point to the exhibit repo, which now exists after
+    #    step 7, so the pushed page never links to a missing repo. ``update_showcase``
+    #    is idempotent — on a re-run of an already-listed exhibit there is nothing
+    #    staged, so commit/push are skipped (a no-op commit would fail with exit 1).
+    run_step(log_path, "showcase-add", ["git", "-C", str(SHOWCASE_DIR), "add", "exhibits.csv", "README.md"])
+    staged = subprocess.run(
+        ["git", "-C", str(SHOWCASE_DIR), "diff", "--cached", "--quiet"],
+        check=False, capture_output=True, text=True,
+    )
+    if staged.returncode != 0:
+        run_step(log_path, "showcase-commit", ["git", "-C", str(SHOWCASE_DIR), "commit", "-m", f"showcase: add {exhibit}"])
+        run_step(log_path, "showcase-push", ["git", "-C", str(SHOWCASE_DIR), "push"])
+    else:
+        log_write(log_path, "showcase: no changes — already up to date")
+        print("showcase: no changes — already up to date")
 
     log_write(log_path, "DONE publish complete")
     print(f"publish {exhibit}: done")
