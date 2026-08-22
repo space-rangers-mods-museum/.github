@@ -158,13 +158,16 @@ python tools/update_showcase.py --exhibit <exhibit> [--name "<mod name>"]
 `exhibits.csv` sits empty — header only:
 
 ```
-mod_name,mod_museum_repo_name,mod_museum_repo_link
+mod_name,mod_author,mod_museum_repo_name,mod_museum_repo_link,mod_summary
 ```
 
-Each run writes one row (mod name, museum repo name, repo link); if the repo name is already in the
-`.csv` the row is not duplicated, so the tool is safe to run repeatedly. The first run writes the
-first row. The showcase main page `README.md` is generated from this `.csv` (layout from
-`template/showcase-readme.md`) and is never hand-edited.
+Each run writes one row (mod name, author, museum repo name, repo link, summary). `mod_author` and
+`mod_summary` are read from the exhibit's generated card `README.md` (the single source of those
+values, in turn built from `ModuleInfo.txt`) — never asked on the command line. If the repo name is
+already in the `.csv` the row is not duplicated; the tool only fills in gaps (including a missing
+author/summary), so it is safe to run repeatedly. The first run writes the first row. The showcase
+main page `README.md` is generated from this `.csv` (layout from `template/showcase-readme.md`) and
+is never hand-edited.
 
 ## 7. Publish via gh
 

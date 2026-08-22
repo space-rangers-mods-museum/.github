@@ -8,10 +8,15 @@ and rebuilds the showcase main page ``README.md`` from that ``.csv``: the
 never hand-edited. Called by the ``publish_exhibit.py`` orchestrator as the
 showcase-local step, or directly for a standalone update.
 
-The row columns (in order) are ``mod_name``, ``mod_museum_repo_name``,
-``mod_museum_repo_link``. If the repository name is already present in the
-``.csv`` the row is not duplicated — the tool only fills in gaps and then
-regenerates the page, so it is safe to run repeatedly.
+The row columns (in order) are ``mod_name``, ``mod_author``,
+``mod_museum_repo_name``, ``mod_museum_repo_link``, ``mod_summary``.
+``mod_author`` and
+``mod_summary`` are read from the exhibit's generated card ``README.md`` (the
+single source of those values, in turn built from ``ModuleInfo.txt``) rather
+than asked for on the command line. If the repository name is already present
+in the ``.csv`` the row is not duplicated — the tool only fills in gaps
+(including a missing author/summary) and then regenerates the page, so it is
+safe to run repeatedly.
 
 The page layout comes from the template file ``template/showcase-readme.md``;
 the tool only substitutes the catalog rows into the ``{{ROWS}}`` placeholder.
@@ -25,16 +30,30 @@ from __future__ import annotations
 
 import argparse
 import csv
+import re
 from pathlib import Path
 
 TOOL_NAME = "update_showcase.py"
-TOOL_VERSION = "1.0.0"
+TOOL_VERSION = "1.1.0"
 DEFAULT_ORG = "space-rangers-mods-museum"
-DEFAULT_HEADER = ["mod_name", "mod_museum_repo_name", "mod_museum_repo_link"]
+DEFAULT_HEADER = [
+    "mod_name",
+    "mod_author",
+    "mod_museum_repo_name",
+    "mod_museum_repo_link",
+    "mod_summary",
+]
 
 TOOLS_DIR = Path(__file__).resolve().parent
 SHOWCASE_DIR = TOOLS_DIR.parent
+MUSEUM_DIR = SHOWCASE_DIR.parent
 TEMPLATE_PATH = SHOWCASE_DIR / "template" / "showcase-readme.md"
+
+AUTHOR_RE = re.compile(r"^\*\s+\*\*Author:\*\*\s*(.*)$")
+
+
+def _col(header: list[str], name: str) -> int:
+    return header.index(name) if name in header else -1
 
 
 def load_rows(csv_path: Path) -> tuple[list[str], list[list[str]]]:
@@ -53,9 +72,55 @@ def save_rows(csv_path: Path, header: list[str], rows: list[list[str]]) -> None:
         writer.writerows(rows)
 
 
-def build_rows_block(rows: list[list[str]]) -> str:
+def read_card_exhibit_summary(exhibit: str) -> tuple[str, str]:
+    """Read ``Author`` and ``Summary`` from the exhibit's generated card README.
+
+    Returns ``(author, summary)``; empty strings when the card is missing or a
+    field is absent. The card is the single source of these values (it is built
+    from ``ModuleInfo.txt`` + the manifest), so the showcase inherits them from
+    there instead of asking for manual input.
+    """
+    card_path = MUSEUM_DIR / exhibit / "README.md"
+    try:
+        lines = card_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return "", ""
+
+    author = ""
+    summary_parts: list[str] = []
+    in_summary = False
+    for line in lines:
+        if not author:
+            m = AUTHOR_RE.match(line)
+            if m:
+                author = m.group(1).strip()
+        stripped = line.strip()
+        if stripped == "### Summary":
+            in_summary = True
+            continue
+        if in_summary:
+            if stripped == "":
+                continue  # blank line right after the heading
+            if stripped.startswith("#"):
+                break  # reached the next section (e.g. "---", "## ")
+            summary_parts.append(stripped)
+    return author, " ".join(summary_parts)
+
+
+def build_rows_block(header: list[str], rows: list[list[str]]) -> str:
     """Render the catalog rows into the markdown table body for {{ROWS}}."""
-    return "\n".join(f"| {row[0]} | [{row[1]}]({row[2]}) |" for row in rows)
+    i_name, i_author = _col(header, "mod_name"), _col(header, "mod_author")
+    i_summary = _col(header, "mod_summary")
+    i_repo, i_link = _col(header, "mod_museum_repo_name"), _col(header, "mod_museum_repo_link")
+
+    def cell(row: list[str], i: int) -> str:
+        return row[i].strip() if 0 <= i < len(row) else ""
+
+    return "\n".join(
+        f"| {cell(row, i_name)} | {cell(row, i_author)} "
+        f"| [{cell(row, i_repo)}]({cell(row, i_link)}) | {cell(row, i_summary)} |"
+        for row in rows
+    )
 
 
 def main() -> None:
@@ -80,15 +145,41 @@ def main() -> None:
     if not header:
         header = DEFAULT_HEADER
 
-    repo_col = 1
-    if not any(len(row) > repo_col and row[repo_col].strip() == exhibit for row in rows):
-        rows.append([name, exhibit, link])
+    i_author, i_summary = _col(header, "mod_author"), _col(header, "mod_summary")
+    i_repo = _col(header, "mod_museum_repo_name")
+    i_link = _col(header, "mod_museum_repo_link")
+
+    # Normalize rows to the header length so later indexing is always safe.
+    for row in rows:
+        if len(row) < len(header):
+            row.extend([""] * (len(header) - len(row)))
+
+    # Backfill missing author/summary for existing rows from their cards.
+    for row in rows:
+        exhibit_id = row[i_repo].strip()
+        if exhibit_id and (not row[i_author].strip() or not row[i_summary].strip()):
+            author, summary = read_card_exhibit_summary(exhibit_id)
+            if not row[i_author].strip():
+                row[i_author] = author
+            if not row[i_summary].strip():
+                row[i_summary] = summary
+
+    # Append a new row if the exhibit is not yet catalogued.
+    if not any(row[i_repo].strip() == exhibit for row in rows):
+        author, summary = read_card_exhibit_summary(exhibit)
+        row = [""] * len(header)
+        row[_col(header, "mod_name")] = name
+        row[i_author] = author
+        row[i_summary] = summary
+        row[i_repo] = exhibit
+        row[i_link] = link
+        rows.append(row)
         print(f"showcase: adding row {name!r} ({exhibit})")
 
     save_rows(csv_path, header, rows)
 
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
-    readme = template.replace("{{ROWS}}", build_rows_block(rows))
+    readme = template.replace("{{ROWS}}", build_rows_block(header, rows))
     readme_path = Path(args.readme)
     readme_path.parent.mkdir(parents=True, exist_ok=True)
     readme_path.write_text(readme, encoding="utf-8")
