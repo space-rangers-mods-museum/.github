@@ -1,4 +1,4 @@
-# 🏛️ {{EXHIBIT}}
+#  {{EXHIBIT}}
 
 ## 📝 Mod
 
