@@ -101,8 +101,8 @@ def read_card_exhibit_summary(exhibit: str) -> tuple[str, str]:
         if in_summary:
             if stripped == "":
                 continue  # blank line right after the heading
-            if stripped.startswith("#"):
-                break  # reached the next section (e.g. "---", "## ")
+            if stripped.startswith("#") or re.fullmatch(r"([-*_])\1{2,}", stripped):
+                break  # reached the next section (e.g. "## " heading or a "---" rule)
             summary_parts.append(stripped)
     return author, " ".join(summary_parts)
 
