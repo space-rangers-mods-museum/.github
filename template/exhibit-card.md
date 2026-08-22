@@ -31,7 +31,7 @@ An ordered chain of steps — from the starting point down to the local archive;
 
 {{FILES}}
 
-> Final archive: `{{ARCHIVE_PATH}}` · SHA-256 `{{ARCHIVE_SHA}}`
+> Final archive: [`{{ARCHIVE_PATH}}`]({{ARCHIVE_LINK}}) · SHA-256 `{{ARCHIVE_SHA}}`
 
 ---
 

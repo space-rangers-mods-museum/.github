@@ -176,6 +176,7 @@ def main() -> None:
             "--manifest", str(out_dir / f"{exhibit}.manifest.json"),
             "--zip", str(out_dir / f"{exhibit}.zip"),
             "--out", str(out_dir / "README.md"),
+            "--org", args.org,
         ],
     )
 

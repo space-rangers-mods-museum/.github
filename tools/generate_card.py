@@ -42,6 +42,8 @@ import yaml
 
 TOOL_NAME = "generate_card.py"
 TOOL_VERSION = "1.4.0"
+DEFAULT_ORG = "space-rangers-mods-museum"
+RELEASE_VERSION = "v1.0.0"  # museum releases are always v1.0.0
 
 TOOLS_DIR = Path(__file__).resolve().parent
 TEMPLATE_PATH = TOOLS_DIR.parent / "template" / "exhibit-card.md"
@@ -142,10 +144,11 @@ def render_files_table(files: list[dict]) -> str:
 
 
 def render_card(exhibit: str, acquire_block: str, manifest: dict, author: str,
-                short_desc: str, full_desc: str, template: str) -> str:
+                short_desc: str, full_desc: str, template: str, org: str) -> str:
     files = manifest.get("files", [])
     archive_path = manifest.get("exhibit_archive", {}).get("path", f"{exhibit}.zip")
     archive_sha = manifest.get("exhibit_archive", {}).get("sha256", "")
+    archive_link = f"https://github.com/{org}/{exhibit}/releases/download/{RELEASE_VERSION}/{archive_path}"
 
     if not acquire_block.strip():
         acquire_block = "_no acquisition steps recorded_"
@@ -158,6 +161,7 @@ def render_card(exhibit: str, acquire_block: str, manifest: dict, author: str,
         .replace("{{ACQUIRE}}", acquire_block)
         .replace("{{FILES}}", files_block)
         .replace("{{ARCHIVE_PATH}}", archive_path)
+        .replace("{{ARCHIVE_LINK}}", archive_link)
         .replace("{{ARCHIVE_SHA}}", archive_sha)
         .replace("{{AUTHOR}}", author)
         .replace("{{SHORT_DESCRIPTION}}", short_desc)
@@ -171,6 +175,7 @@ def main() -> None:
     parser.add_argument("--manifest", required=True, help="path to the exhibit .manifest.json")
     parser.add_argument("--zip", required=True, help="path to the exhibit .zip (for ModuleInfo.txt)")
     parser.add_argument("--out", default="README.md", help="output path for the card README.md")
+    parser.add_argument("--org", default=DEFAULT_ORG, help=f"museum org (default: {DEFAULT_ORG})")
     args = parser.parse_args()
 
     with open(args.yaml, encoding="utf-8") as fh:
@@ -192,7 +197,7 @@ def main() -> None:
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
-        render_card(exhibit, acquire_block, manifest, author, short_desc, full_desc, template),
+        render_card(exhibit, acquire_block, manifest, author, short_desc, full_desc, template, args.org),
         encoding="utf-8",
     )
     print(f"card: {out}")
