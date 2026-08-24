@@ -7,7 +7,7 @@ exhibit; each step starts only after the previous one completes.
 
 | input                                                   | command                                                   | output                                                                                                       |
 |---------------------------------------------------------|-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
-| filled `exhibits/<exhibit>.yaml` (`source` + `acquire`) | `python tools/publish_exhibit.py exhibits/<exhibit>.yaml` | exhibit repo `space-rangers-mods-museum/<exhibit>` created + pushed; release `v1.0.0` (title = exhibit name) |
+| filled `../<exhibit>/<exhibit>.yaml` (`source` + `acquire`) | `python tools/publish_exhibit.py ../<exhibit>/<exhibit>.yaml` | exhibit repo `space-rangers-mods-museum/<exhibit>` created + pushed; release `v1.0.0` (title = exhibit name) |
 
 ## Step by step
 
@@ -22,10 +22,10 @@ nested inside the showcase repo.
 
 | step                          | phase     | input                                                          | command                                                                                                                                                             | output                                                                         |
 |-------------------------------|-----------|----------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
-| 1. Input — exhibit YAML       | safe      | manual excavation (link chains, Discord channels, dates)       | *(manual)* copy `template/exhibit-input.yaml` → fill `exhibits/<exhibit>.yaml`                                                                                          | YAML with `source` + `acquire`                                                 |
-| 2. Extract & repack           | safe      | `source.path` (local file / google-disk link) + `source.target`| `python tools/extract_exhibit.py --exhibit <exhibit> --mod-dir <source.target> --source <source.path> --out-dir <out-dir>`                                          | `<exhibit>.zip`, `<exhibit>.manifest.json` (archive hash + per-file hashes)   |
-| 3. Card                       | safe      | YAML + `.manifest.json` + `.zip`                               | `python tools/generate_card.py --yaml exhibits/<exhibit>.yaml --manifest <out-dir>/<exhibit>.manifest.json --zip <out-dir>/<exhibit>.zip --out <out-dir>/README.md` | `README.md` (acquire route + author + descriptions + hashes)                  |
-| 4. Local repository           | safe      | artifacts of steps 2–3                                        | `python tools/publish_exhibit.py exhibits/<exhibit>.yaml --no-publish` (runs steps 2–6)                                                                              | repo folder `<out-dir>`: `README.md`, `<exhibit>.yaml`, `<exhibit>.manifest.json`, `.gitignore` |
+| 1. Input — exhibit YAML       | safe      | manual excavation (link chains, Discord channels, dates)       | *(manual)* copy `template/exhibit-input.yaml` → fill `../<exhibit>/<exhibit>.yaml`                                                                                          | YAML with `source` + `acquire`                                                 |
+| 2. Extract & repack           | safe      | `source` (ordered array: each entry `kind`/`path`/`target`)    | `python tools/extract_exhibit.py --exhibit <exhibit> --source '{"kind":"exe","path":<installer>,"target":<mod folder>}' --source '{"kind":"zip","path":<update.zip>,"target":<mod folder>}' --out-dir <out-dir>` | `<exhibit>.zip`, `<exhibit>.manifest.json` (archive hash + per-file hashes)   |
+| 3. Card                       | safe      | YAML + `.manifest.json` + `.zip`                               | `python tools/generate_card.py --yaml ../<exhibit>/<exhibit>.yaml --manifest <out-dir>/<exhibit>.manifest.json --zip <out-dir>/<exhibit>.zip --out <out-dir>/README.md` | `README.md` (acquire route + author + descriptions + hashes)                  |
+| 4. Local repository           | safe      | artifacts of steps 2–3                                        | `python tools/publish_exhibit.py ../<exhibit>/<exhibit>.yaml --no-publish` (runs steps 2–6)                                                                              | repo folder `<out-dir>`: `README.md`, `<exhibit>.yaml`, `<exhibit>.manifest.json`, `.gitignore` |
 | 5. Local git repository       | safe      | repo folder (step 4)                                          | `git -C <out-dir> init` + `git -C <out-dir> add -A` + `git -C <out-dir> commit -m "Add <exhibit>"` (done by the orchestrator in the same `--no-publish` run) | local git repo at `<out-dir>` with the initial commit — no remote yet          |
 | 6. Showcase — local update    | safe      | exhibit id                                                    | `python tools/update_showcase.py --exhibit <exhibit>` (called by the orchestrator as the `showcase-local` step)                                                       | `.csv` row + main page rebuilt in `museum/.github` (local, not yet pushed)     |
 | 7. Publish exhibit repo via gh| side-effect | `<out-dir>` folder                                          | `gh repo create space-rangers-mods-museum/<exhibit> --public --source <out-dir> --push` then `gh release create v1.0.0 --title "<exhibit>" <out-dir>/<exhibit>.zip` | exhibit repo `space-rangers-mods-museum/<exhibit>` live; `.zip` uploaded as release asset, then removed locally |
@@ -53,22 +53,25 @@ Three GitHub entities in the museum — do not conflate them:
 
 ## 1. Input — exhibit YAML
 
-`exhibits/<exhibit>.yaml` is the single source of data for the pipeline: `source` feeds
-`extract_exhibit.py` (path — a google disk link that the orchestrator downloads itself, or a path to
-an already-present local file — then no download, just extract; target — the mod folder inside the
-source), `acquire` — the route for the card (ref/note/date fields always present, values may be
-empty).
-Template: `template/exhibit-input.yaml`, example: `exhibits/LEOGraphicsMod.yaml`.
+`../<exhibit>/<exhibit>.yaml` is the single source of data for the pipeline: `source` feeds
+`extract_exhibit.py` — an ordered array, each entry with `kind` (`zip` or `exe`), `path` (a google
+disk link that the orchestrator downloads itself, or a path to an already-present local file — then
+no download, just extract) and `target` (the mod folder inside the source). `acquire` — the route
+for the card (ref/note/date fields always present, values may be empty).
+Template: `template/exhibit-input.yaml`, example: `../LEOGraphicsMod/LEOGraphicsMod.yaml`.
 
-### Manual excavation → `exhibits/<exhibit>.yaml`
+### Manual excavation → `../<exhibit>/<exhibit>.yaml`
 
 Excavation is a manual search; there is no intermediate notes artifact. The participant records the
 found route straight into the YAML. For each exhibit one YAML is assembled from its route:
 
 - `exhibit` — the mod id (name of the museum repo folder).
-- `source` — where the files come from: `path` — a local archive/folder (relative path resolves
-  against this YAML) or a google disk link; `target` — the path to the mod folder inside the source
-  (e.g. `Mods/Solyanka/LEOGraphicsMod`).
+- `source` — where the files come from: an ordered array of sources, each with `kind` (`zip` archive
+  or `exe` installer), `path` — a local archive (relative path resolves against this YAML) or a
+  google disk link; `target` — the path to the mod folder inside the source (e.g.
+  `Mods/Expansion/ExpPilotBridge`). A later source's files overwrite an earlier one's with the same
+  relative path — use the installer `.exe` first (it carries `ModuleInfo.txt`), then the update
+  `.zip` (its newer files replace the base's stale copies).
 - `acquire` — each step of the chain (from the starting point to the local file) becomes a
   `ref`/`note`/`date` entry: `ref` — the step's working link, `note` — a short description
   in English (verbatim names of external resources — Discord channels, collection/mod-pack titles —
@@ -83,7 +86,7 @@ showcase commit & push in order, writes a per-step log and stops on the failed s
 limited to filling in the YAML.
 
 ```
-python tools/publish_exhibit.py exhibits/LEOGraphicsMod.yaml
+python tools/publish_exhibit.py ../LEOGraphicsMod/LEOGraphicsMod.yaml
 ```
 
 `--no-publish` stops after the safe local steps (2–6, up to and including the local showcase update)
@@ -93,11 +96,16 @@ commit & push).
 
 ## 2. Extract and repack
 
-`tools/extract_exhibit.py` deterministically extracts the mod folder from `source` and repacks it
-into a clean archive with `ModuleInfo.txt` at its root.
+`tools/extract_exhibit.py` merges the mod folder from every entry in the `source` array into a shared
+staging area — a later source's file overwrites an earlier one with the same relative path — and
+deterministically repacks the result into a clean archive with `ModuleInfo.txt` at its root. Each
+source is either a `zip` archive (read directly) or a full-game installer `.exe` (opened with
+innoextract — the binary lives at `museum/innoextract/innoextract.exe` or on PATH). A typical pair is
+the installer `.exe` first (base, has `ModuleInfo.txt`), then the update `.zip` (its newer files
+overwrite the base's stale copies).
 
-Artifacts: `<exhibit>.zip`, `<exhibit>.manifest.json` — the manifest carries both the SHA-256 of the
-final archive and the per-file hashes (there is no separate `.sha256` file).
+Artifacts: `<exhibit>.zip`, `<exhibit>.manifest.json` — the manifest carries the SHA-256 of the
+final archive, the per-file hashes, and one entry per source (there is no separate `.sha256` file).
 
 ## 3. Card
 
@@ -121,7 +129,7 @@ generated `.gitignore` (excludes `*.zip` and `*.log`) are written by the tools i
 git repo. Assembled by the orchestrator (see above):
 
 ```
-python tools/publish_exhibit.py exhibits/<exhibit>.yaml --out-dir <out-dir> --no-publish
+python tools/publish_exhibit.py ../<exhibit>/<exhibit>.yaml --out-dir <out-dir> --no-publish
 ```
 
 `--no-publish` stops after the safe local steps (2–6, incl. the local showcase update) — no `gh`,

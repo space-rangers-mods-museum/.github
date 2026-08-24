@@ -5,8 +5,10 @@ What this does
 Reads a single exhibit YAML and runs the publish chain in strict order, writing
 a log line for every step and stopping on the first failed step:
 
-  1. resolve the source — if ``source.path`` is a URL (e.g. a google disk link),
-     download it to a temp file; if it is an existing local path, use it as-is;
+  1. resolve the source(s) — ``source`` may be a single dict or an ordered list
+     of dicts (each with ``kind``/``path``/``target``). Every ``path`` is resolved
+     (a URL, e.g. a google disk link, is downloaded to a temp file; an existing
+     local path is used as-is) and handed to the extract step;
   2. extract and repack the mod folder (``extract_exhibit.py``);
   3. generate the card README (``generate_card.py``);
   4. form the local repository folder (card + a copy of the exhibit YAML +
@@ -42,6 +44,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import json
 import shutil
 import subprocess
 import sys
@@ -54,7 +57,7 @@ import yaml
 from generate_card import first_field, read_module_info
 
 TOOL_NAME = "publish_exhibit.py"
-TOOL_VERSION = "1.3.0"
+TOOL_VERSION = "1.4.0"
 DEFAULT_ORG = "space-rangers-mods-museum"
 RELEASE_VERSION = "v1.0.0"  # archive versioning is out of scope — always v1.0.0
 
@@ -134,11 +137,11 @@ def main() -> None:
     if not exhibit:
         print("ERROR: YAML is missing the 'exhibit' field")
         raise SystemExit(1)
-    source = data.get("source") or {}
-    source_path = (source.get("path") or "").strip()
-    source_target = (source.get("target") or "").strip()
-    if not source_path or not source_target:
-        print("ERROR: YAML is missing 'source.path' / 'source.target'")
+    source = data.get("source") or []
+    if isinstance(source, dict):
+        source = [source]
+    if not isinstance(source, list) or not source:
+        print("ERROR: YAML 'source' must be a dict or a non-empty list of source dicts")
         raise SystemExit(1)
 
     # Default out-dir: the museum working dir (parent of the .github showcase repo),
@@ -153,21 +156,30 @@ def main() -> None:
     work_dir = Path(tempfile.mkdtemp(prefix=f"publish_{exhibit}_"))
     yaml_dir = Path(args.yaml_path).resolve().parent
 
-    # 1. Resolve the source (download if URL, else local path).
-    local_source = resolve_source(source_path, yaml_dir, log_path, work_dir)
+    # 1. Resolve the source(s) (download if URL, else local path).
+    source_specs = []
+    for src in source:
+        kind = (src.get("kind") or "zip").strip().lower()
+        src_path = (src.get("path") or "").strip()
+        src_target = (src.get("target") or src.get("mod_dir") or "").strip().rstrip("/")
+        if not src_path or not src_target:
+            print("ERROR: each YAML 'source' entry needs 'path' and 'target'")
+            raise SystemExit(1)
+        local = resolve_source(src_path, yaml_dir, log_path, work_dir)
+        spec = {"kind": kind, "path": str(local), "mod_dir": src_target}
+        if src.get("sha256"):
+            spec["sha256"] = str(src["sha256"]).strip()
+        source_specs.append(spec)
 
-    # 2. Extract and repack.
-    run_step(
-        log_path,
-        "extract",
-        [
-            sys.executable, str(TOOLS_DIR / "extract_exhibit.py"),
-            "--exhibit", exhibit,
-            "--mod-dir", source_target,
-            "--source", str(local_source),
-            "--out-dir", str(out_dir),
-        ],
-    )
+    # 2. Extract and repack (later sources overwrite earlier ones in the merge).
+    extract_argv = [
+        sys.executable, str(TOOLS_DIR / "extract_exhibit.py"),
+        "--exhibit", exhibit,
+        "--out-dir", str(out_dir),
+    ]
+    for spec in source_specs:
+        extract_argv += ["--source", json.dumps(spec)]
+    run_step(log_path, "extract", extract_argv)
 
     # 3. Generate the card README.
     run_step(
@@ -185,8 +197,11 @@ def main() -> None:
 
     # 4. Form the local repository folder — the source files of the exhibit.
     #    Copy the exhibit YAML in first: it records where the instance came from
-    #    and lives with the exhibit.
-    shutil.copy2(args.yaml_path, out_dir / Path(args.yaml_path).name)
+    #    and lives with the exhibit. When the YAML already sits in the repo
+    #    folder (in-place exhibits), the copy is a no-op.
+    dest_yaml = out_dir / Path(args.yaml_path).name
+    if Path(args.yaml_path).resolve() != dest_yaml.resolve():
+        shutil.copy2(args.yaml_path, dest_yaml)
 
     #    The archive is intentionally NOT part of the folder: it ships as a
     #    release asset instead, so ``.zip`` is excluded; the pipeline log
@@ -209,7 +224,18 @@ def main() -> None:
     #    generated ``.gitignore``.
     run_step(log_path, "git-init", ["git", "-C", str(out_dir), "init"])
     run_step(log_path, "git-add", ["git", "-C", str(out_dir), "add", "-A"])
-    run_step(log_path, "git-commit", ["git", "-C", str(out_dir), "commit", "-m", f"Add {exhibit} exhibit"])
+    # Commit only if there are staged changes — a re-run of an unchanged exhibit
+    # (e.g. after a --no-publish verification pass) has nothing to commit, and
+    # ``git commit`` would fail with exit 1.
+    staged = subprocess.run(
+        ["git", "-C", str(out_dir), "diff", "--cached", "--quiet"],
+        check=False, capture_output=True, text=True,
+    )
+    if staged.returncode != 0:
+        run_step(log_path, "git-commit", ["git", "-C", str(out_dir), "commit", "-m", f"Add {exhibit} exhibit"])
+    else:
+        log_write(log_path, "git-commit: no changes — repo already up to date")
+        print("git-commit: no changes — repo already up to date")
 
     # 6. Showcase — local update. Safe, local step: append the exhibit to the
     #    museum mod list ``exhibits.csv`` and rebuild the showcase main page in
