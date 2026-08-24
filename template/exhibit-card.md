@@ -1,7 +1,5 @@
 # 🗄️ {{EXHIBIT}}
 
-## 📝 Mod
-
 * **Name:** {{EXHIBIT}}
 * **Author:** {{AUTHOR}}
 
@@ -37,4 +35,4 @@ An ordered chain of steps — from the starting point down to the local archive;
 
 ## ⚖️ Copyright & Disclaimer
 
-**All Rights Reserved:** the authorship of this modification fully belongs to the developer **{{AUTHOR}}** (per `ModuleInfo.txt`). This publication is made solely for digital archaeology, preserving the history of the gaming community, and educational purposes (Fair Use), without any claim to the original copyright.
+**All Rights Reserved:** the authorship of this modification fully belongs to **{{AUTHOR}}** (per `ModuleInfo.txt`). This publication is made solely for digital archaeology, preserving the history of the gaming community, and educational purposes (Fair Use), without any claim to the original copyright.
