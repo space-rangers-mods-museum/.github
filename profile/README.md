@@ -28,3 +28,4 @@ The full step-by-step workflow and tooling are documented in [workflow.md](https
 | LEOGraphicsMod | LEOPARD | [LEOGraphicsMod](https://github.com/space-rangers-mods-museum/LEOGraphicsMod) | Содержит в себе всю графику и звук из "Солянки" и "AnotherMods" |
 | ExpPilotBridge | Huk, 100kg, Klaxons | [ExpPilotBridge](https://github.com/space-rangers-mods-museum/ExpPilotBridge) | Добавляет функциональный капитанский мостик всем кораблям в игре |
 | UtilityFunctionsPack | Klaxons, denball | [UtilityFunctionsPack](https://github.com/space-rangers-mods-museum/UtilityFunctionsPack) | Adds a set of useful modding features |
+| AMod_MapMarker | Huk | [AMod_MapMarker](https://github.com/space-rangers-mods-museum/AMod_MapMarker) | Adds ability to place a mark on the system on Galamap |
