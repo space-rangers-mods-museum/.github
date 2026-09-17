@@ -22,6 +22,6 @@ The full step-by-step workflow and tooling are documented in [workflow.md](workf
 
 ## 📚 Exhibit catalog
 
-| Mod | Author | Exhibit | Summary |
-|-----|--------|---------|---------|
+| Mod | Author | Exhibit | Note | Summary |
+|-----|--------|---------|------|---------|
 {{ROWS}}

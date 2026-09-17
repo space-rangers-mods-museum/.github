@@ -27,6 +27,14 @@ a log line for every step and stopping on the first failed step:
   9. commit & push the showcase changes (``git add/commit/push`` in ``.github``)
      — only after step 7 succeeded, so the pushed page links to a live repo.
 
+The exhibit is published under its ``github_id`` — the YAML field of the same
+name, defaulting to ``exhibit``. It names the local repository folder, the
+release archive and the GitHub repository; the manifest and the YAML keep the
+mod's own name (``<exhibit>.manifest.json`` / ``<exhibit>.yaml``). The id
+differs from ``exhibit``
+only for a REDUX edition of a mod that also exists in UNI, which takes the
+``redux__`` prefix (e.g. ``redux__ExpRC``); the mod's own id stays unprefixed.
+
 Pass ``--no-publish`` to run steps 1-6 only (extract -> card -> repo-folder ->
 local git init -> showcase local update) without touching ``gh`` or the remote —
 useful for a local verification run.
@@ -54,10 +62,10 @@ from pathlib import Path
 
 import yaml
 
-from generate_card import first_field, read_module_info
+from generate_card import joined_field, read_module_info
 
 TOOL_NAME = "publish_exhibit.py"
-TOOL_VERSION = "1.4.0"
+TOOL_VERSION = "1.6.0"
 DEFAULT_ORG = "space-rangers-mods-museum"
 RELEASE_VERSION = "v1.0.0"  # archive versioning is out of scope — always v1.0.0
 
@@ -137,6 +145,10 @@ def main() -> None:
     if not exhibit:
         print("ERROR: YAML is missing the 'exhibit' field")
         raise SystemExit(1)
+    # The id the exhibit is published under. It equals ``exhibit``, unless the mod also exists
+    # in UNI — then the REDUX edition carries the ``redux__`` prefix. It names the repository
+    # folder, the archive/manifest and the GitHub repository.
+    github_id = (data.get("github_id") or exhibit).strip() or exhibit
     source = data.get("source") or []
     if isinstance(source, dict):
         source = [source]
@@ -146,14 +158,14 @@ def main() -> None:
 
     # Default out-dir: the museum working dir (parent of the .github showcase repo),
     # so exhibit repos sit flat next to .github — never nested inside the showcase repo.
-    out_dir = Path(args.out_dir) if args.out_dir else Path(TOOLS_DIR).parent.parent / exhibit
+    out_dir = Path(args.out_dir) if args.out_dir else Path(TOOLS_DIR).parent.parent / github_id
     out_dir.mkdir(parents=True, exist_ok=True)
     log_path = Path(args.log) if args.log else out_dir / "publish.log"
 
-    log_write(log_path, f"START publish {exhibit} ({TOOL_NAME} {TOOL_VERSION})")
-    print(f"publish {exhibit}: chain start")
+    log_write(log_path, f"START publish {exhibit} as {github_id} ({TOOL_NAME} {TOOL_VERSION})")
+    print(f"publish {exhibit} (github_id {github_id}): chain start")
 
-    work_dir = Path(tempfile.mkdtemp(prefix=f"publish_{exhibit}_"))
+    work_dir = Path(tempfile.mkdtemp(prefix=f"publish_{github_id}_"))
     yaml_dir = Path(args.yaml_path).resolve().parent
 
     # 1. Resolve the source(s) (download if URL, else local path).
@@ -175,6 +187,7 @@ def main() -> None:
     extract_argv = [
         sys.executable, str(TOOLS_DIR / "extract_exhibit.py"),
         "--exhibit", exhibit,
+        "--archive-name", github_id,
         "--out-dir", str(out_dir),
     ]
     for spec in source_specs:
@@ -189,7 +202,7 @@ def main() -> None:
             sys.executable, str(TOOLS_DIR / "generate_card.py"),
             "--yaml", str(Path(args.yaml_path)),
             "--manifest", str(out_dir / f"{exhibit}.manifest.json"),
-            "--zip", str(out_dir / f"{exhibit}.zip"),
+            "--zip", str(out_dir / f"{github_id}.zip"),
             "--out", str(out_dir / "README.md"),
             "--org", args.org,
         ],
@@ -232,7 +245,7 @@ def main() -> None:
         check=False, capture_output=True, text=True,
     )
     if staged.returncode != 0:
-        run_step(log_path, "git-commit", ["git", "-C", str(out_dir), "commit", "-m", f"Add {exhibit} exhibit"])
+        run_step(log_path, "git-commit", ["git", "-C", str(out_dir), "commit", "-m", f"Add {github_id} exhibit"])
     else:
         log_write(log_path, "git-commit: no changes — repo already up to date")
         print("git-commit: no changes — repo already up to date")
@@ -244,7 +257,7 @@ def main() -> None:
     run_step(
         log_path,
         "showcase-local",
-        [sys.executable, str(TOOLS_DIR / "update_showcase.py"), "--exhibit", exhibit],
+        [sys.executable, str(TOOLS_DIR / "update_showcase.py"), "--exhibit", github_id, "--mod-id", exhibit],
     )
 
     if args.no_publish:
@@ -258,8 +271,8 @@ def main() -> None:
     #    description, so the new repo is not an empty "No description"
     #    placeholder. GitHub caps descriptions at 350 chars, so the summary is
     #    truncated to fit.
-    summary = first_field(read_module_info(out_dir / f"{exhibit}.zip"), "SmallDescriptionEng", "SmallDescription")
-    create_cmd = ["gh", "repo", "create", f"{args.org}/{exhibit}", "--public", "--source", str(out_dir), "--push"]
+    summary = joined_field(read_module_info(out_dir / f"{github_id}.zip"), "SmallDescriptionEng", "SmallDescription")
+    create_cmd = ["gh", "repo", "create", f"{args.org}/{github_id}", "--public", "--source", str(out_dir), "--push"]
     if summary:
         create_cmd += ["--description", summary[:350]]
     run_step(log_path, "gh-create-repo", create_cmd)
@@ -271,25 +284,25 @@ def main() -> None:
     run_step(
         log_path,
         "gh-release",
-        ["gh", "release", "create", RELEASE_VERSION, "--repo", f"{args.org}/{exhibit}", "--title", exhibit, str(out_dir / f"{exhibit}.zip")],
+        ["gh", "release", "create", RELEASE_VERSION, "--repo", f"{args.org}/{github_id}", "--title", github_id, str(out_dir / f"{github_id}.zip")],
     )
 
     #    The archive now lives as the GitHub release asset — remove the local
     #    copy so it does not linger in the repo folder as a source file.
-    (out_dir / f"{exhibit}.zip").unlink(missing_ok=True)
+    (out_dir / f"{github_id}.zip").unlink(missing_ok=True)
 
     # 9. Showcase — commit & push. Side-effect step: the updated ``exhibits.csv``
     #    and main page (step 6) point to the exhibit repo, which now exists after
     #    step 7, so the pushed page never links to a missing repo. ``update_showcase``
     #    is idempotent — on a re-run of an already-listed exhibit there is nothing
     #    staged, so commit/push are skipped (a no-op commit would fail with exit 1).
-    run_step(log_path, "showcase-add", ["git", "-C", str(SHOWCASE_DIR), "add", "exhibits.csv", "README.md"])
+    run_step(log_path, "showcase-add", ["git", "-C", str(SHOWCASE_DIR), "add", "exhibits.csv", "README.md", "profile/README.md"])
     staged = subprocess.run(
         ["git", "-C", str(SHOWCASE_DIR), "diff", "--cached", "--quiet"],
         check=False, capture_output=True, text=True,
     )
     if staged.returncode != 0:
-        run_step(log_path, "showcase-commit", ["git", "-C", str(SHOWCASE_DIR), "commit", "-m", f"showcase: add {exhibit}"])
+        run_step(log_path, "showcase-commit", ["git", "-C", str(SHOWCASE_DIR), "commit", "-m", f"showcase: add {github_id}"])
         run_step(log_path, "showcase-push", ["git", "-C", str(SHOWCASE_DIR), "push"])
     else:
         log_write(log_path, "showcase: no changes — already up to date")

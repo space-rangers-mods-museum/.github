@@ -9,11 +9,18 @@ never hand-edited. Called by the ``publish_exhibit.py`` orchestrator as the
 showcase-local step, or directly for a standalone update.
 
 The row columns (in order) are ``mod_name``, ``mod_author``,
-``mod_museum_repo_name``, ``mod_museum_repo_link``, ``mod_summary``.
+``mod_museum_repo_name``, ``mod_museum_repo_link``, ``mod_summary``,
+``mod_github_id``, ``mod_note``. ``mod_museum_repo_name`` is the mod's own id (no prefix),
+``mod_github_id`` the repository/artifact id it is published under — the same
+value unless the mod also exists in UNI, in which case the REDUX edition is
+published as ``redux__<id>``. The link and the row's de-duplication key are the
+``mod_github_id``; the Exhibit column of the page shows it, and ``mod_note``
+carries the duplicate marker derived from the two ids (a hand-written note is
+never overwritten).
 ``mod_author`` and
 ``mod_summary`` are read from the exhibit's generated card ``README.md`` (the
 single source of those values, in turn built from ``ModuleInfo.txt``) rather
-than asked for on the command line. If the repository name is already present
+than asked for on the command line. If the repository id is already present
 in the ``.csv`` the row is not duplicated — the tool only fills in gaps
 (including a missing author/summary) and then regenerates the page, so it is
 safe to run repeatedly.
@@ -39,7 +46,7 @@ import re
 from pathlib import Path
 
 TOOL_NAME = "update_showcase.py"
-TOOL_VERSION = "1.2.0"
+TOOL_VERSION = "1.4.0"
 DEFAULT_ORG = "space-rangers-mods-museum"
 DEFAULT_HEADER = [
     "mod_name",
@@ -47,7 +54,21 @@ DEFAULT_HEADER = [
     "mod_museum_repo_name",
     "mod_museum_repo_link",
     "mod_summary",
+    "mod_github_id",
+    "mod_note",
 ]
+# The catalog note of a duplicate edition (the same mod published from more than one pack).
+DUPLICATE_NOTE = "⚠️"
+
+
+def note_for(mod_id: str, github_id: str) -> str:
+    """Catalog note for an exhibit — derived from its ids, so it cannot drift.
+
+    An exhibit published under a different id than the mod's own (the REDUX edition of a mod
+    that also exists in UNI) is a duplicate, and is marked as such. A note written by hand in
+    the ``.csv`` is never overwritten — the tool only fills an empty cell.
+    """
+    return DUPLICATE_NOTE if github_id != mod_id else ""
 
 TOOLS_DIR = Path(__file__).resolve().parent
 SHOWCASE_DIR = TOOLS_DIR.parent
@@ -114,17 +135,28 @@ def read_card_exhibit_summary(exhibit: str) -> tuple[str, str]:
 
 
 def build_rows_block(header: list[str], rows: list[list[str]]) -> str:
-    """Render the catalog rows into the markdown table body for {{ROWS}}."""
+    """Render the catalog rows into the markdown table body for {{ROWS}}.
+
+    The Exhibit column shows the ``mod_github_id`` — the id the repository is
+    published under, which carries the ``redux__`` prefix for a REDUX edition of
+    a mod that also exists in UNI. Rows written before the column existed fall
+    back to the repository-name column.
+    """
     i_name, i_author = _col(header, "mod_name"), _col(header, "mod_author")
     i_summary = _col(header, "mod_summary")
     i_repo, i_link = _col(header, "mod_museum_repo_name"), _col(header, "mod_museum_repo_link")
+    i_gh = _col(header, "mod_github_id")
+    i_note = _col(header, "mod_note")
 
     def cell(row: list[str], i: int) -> str:
         return row[i].strip() if 0 <= i < len(row) else ""
 
+    def exhibit_cell(row: list[str]) -> str:
+        return cell(row, i_gh) or cell(row, i_repo)
+
     return "\n".join(
         f"| {cell(row, i_name)} | {cell(row, i_author)} "
-        f"| [{cell(row, i_repo)}]({cell(row, i_link)}) | {cell(row, i_summary)} |"
+        f"| [{exhibit_cell(row)}]({cell(row, i_link)}) | {cell(row, i_note)} | {cell(row, i_summary)} |"
         for row in rows
     )
 
@@ -178,8 +210,9 @@ def _link_sub(org: str):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--exhibit", required=True, help="museum repo id of the exhibit (same as the repo name)")
-    parser.add_argument("--name", help="display mod name (default: same as --exhibit)")
+    parser.add_argument("--exhibit", required=True, help="museum repo id of the exhibit — the github_id (folder + repository name)")
+    parser.add_argument("--mod-id", help="the mod's own id, without the redux__ prefix (default: same as --exhibit)")
+    parser.add_argument("--name", help="display mod name (default: the mod id)")
     parser.add_argument("--org", default=DEFAULT_ORG, help=f"museum org (default: {DEFAULT_ORG})")
     parser.add_argument("--csv", default=str(SHOWCASE_DIR / "exhibits.csv"), help="path to the museum mod list .csv")
     parser.add_argument("--readme", default=str(SHOWCASE_DIR / "README.md"), help="path to the showcase main page README.md")
@@ -190,7 +223,8 @@ def main() -> None:
     if not exhibit:
         print("ERROR: --exhibit must not be empty")
         raise SystemExit(1)
-    name = (args.name or exhibit).strip() or exhibit
+    mod_id = (args.mod_id or exhibit).strip() or exhibit
+    name = (args.name or mod_id).strip() or mod_id
     link = f"https://github.com/{args.org}/{exhibit}"
 
     csv_path = Path(args.csv)
@@ -202,6 +236,10 @@ def main() -> None:
     i_author, i_summary = _col(header, "mod_author"), _col(header, "mod_summary")
     i_repo = _col(header, "mod_museum_repo_name")
     i_link = _col(header, "mod_museum_repo_link")
+    i_gh = _col(header, "mod_github_id")
+    if i_gh < 0:  # a .csv written before the column existed — keep the repo-name column authoritative
+        i_gh = i_repo
+    i_note = _col(header, "mod_note")
 
     # Normalize rows to the header length so later indexing is always safe.
     for row in rows:
@@ -210,7 +248,7 @@ def main() -> None:
 
     # Backfill missing author/summary for existing rows from their cards.
     for row in rows:
-        exhibit_id = row[i_repo].strip()
+        exhibit_id = row[i_gh].strip() or row[i_repo].strip()
         if exhibit_id and (not row[i_author].strip() or not row[i_summary].strip()):
             author, summary = read_card_exhibit_summary(exhibit_id)
             if not row[i_author].strip():
@@ -218,17 +256,28 @@ def main() -> None:
             if not row[i_summary].strip():
                 row[i_summary] = summary
 
-    # Append a new row if the exhibit is not yet catalogued.
-    if not any(row[i_repo].strip() == exhibit for row in rows):
+    # Fill in a missing duplicate marker — derived from the ids, so it cannot drift from the
+    # catalog; a note already written by hand is left alone.
+    if i_note >= 0:
+        for row in rows:
+            if not row[i_note].strip():
+                row[i_note] = note_for(row[i_repo].strip(), row[i_gh].strip() or row[i_repo].strip())
+
+    # Append a new row if the exhibit is not yet catalogued — keyed by its github_id, falling
+    # back to the mod-id column so rows written before the github_id column existed still match.
+    if not any(row[i_gh].strip() == exhibit or row[i_repo].strip() == exhibit for row in rows):
         author, summary = read_card_exhibit_summary(exhibit)
         row = [""] * len(header)
         row[_col(header, "mod_name")] = name
         row[i_author] = author
         row[i_summary] = summary
-        row[i_repo] = exhibit
+        row[i_repo] = mod_id
+        row[i_gh] = exhibit
         row[i_link] = link
+        if i_note >= 0:
+            row[i_note] = note_for(mod_id, exhibit)
         rows.append(row)
-        print(f"showcase: adding row {name!r} ({exhibit})")
+        print(f"showcase: adding row {name!r} (mod id {mod_id}, github_id {exhibit})")
 
     save_rows(csv_path, header, rows)
 

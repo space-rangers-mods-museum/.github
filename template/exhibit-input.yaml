@@ -1,13 +1,21 @@
 # Empty YAML template for an exhibit. Copy to exhibits/<exhibit>.yaml and fill in.
 # Schema in design.md, section "Input: YAML per exhibit".
 
-exhibit: <id>   # id = mod repo folder in the museum
+exhibit: <id>      # mod id (no prefix) — the mod's own name: the mod_name column and the card heading
+github_id: <id>    # repository / folder / artifact id — the SAME as exhibit, unless this mod also exists in
+                   # UNI: then the REDUX edition takes the redux__ prefix (e.g. redux__ExpRC) — see workflow.md
 
 # internal — input for extract_exhibit.py, NOT shown on the card
+# an ORDERED list: a later source's files OVERWRITE an earlier one's with the same relative
+# path — the base installer first, the update/overlay archives on top of it
 source:
-  kind: zip                         # first implementation — zip only
-  path: <source>                    # google disk link (downloads it and extracts) OR path to an existing local file (extracts without downloading); relative paths resolve against this file's folder
-  target: <mod folder path inside the source>   # e.g. Mods/Solyanka/LEOGraphicsMod
+  - kind: exe                       # zip | exe | 7z (exe = a full-game installer; a multi-part one
+                                    # needs its .bin slices to stay next to the .exe)
+    path: <source>                    # google disk link (downloads it and extracts) OR path to an existing local file (extracts without downloading); relative paths resolve against this file's folder
+    target: <mod folder path inside the source>   # e.g. Mods/Solyanka/LEOGraphicsMod
+  - kind: zip                       # optional second source, e.g. the pack's update archive
+    path: <update or overlay archive>
+    target: <the same mod folder path>
 
 # public — acquisition route, rendered in the card README.md
 # chain from the start point down to the local file; ref/note/date fields are always

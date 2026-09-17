@@ -1,6 +1,6 @@
 # 🗄️ {{EXHIBIT}}
 
-* **Name:** {{EXHIBIT}}
+* **Name:** {{NAME}}
 * **Author:** {{AUTHOR}}
 
 ### Summary

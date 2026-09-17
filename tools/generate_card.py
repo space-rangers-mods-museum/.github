@@ -7,12 +7,17 @@ repository in the museum carries:
 
   * the exhibit YAML (the ``acquire`` section — the ordered chain of how the
     local archive was obtained, reproduced verbatim as it appears in the input
-    YAML);
+    YAML; and ``github_id`` — the repository/artifact id, which equals
+    ``exhibit`` unless the mod also exists in UNI, in which case the REDUX
+    edition carries the ``redux__`` prefix. The id heads the card and names the
+    archive and the release URL, while the ``Name:`` line keeps the mod's own
+    name — the exhibit is distinguishable, the mod is still called what it is);
   * the ``.manifest.json`` produced by ``extract_exhibit.py`` — per-file
     SHA-256 hashes and the SHA-256 of the final archive;
   * ``ModuleInfo.txt`` inside the exhibit archive — the ``Author=`` field (for
     attribution) and the descriptions: a short one (``SmallDescriptionEng``,
-    falling back to ``SmallDescription``) rendered in the card's ``Summary``
+    falling back to ``SmallDescription``; several ``Key=`` lines of it are joined
+    into one message) rendered in the card's ``Summary``
     block, and a detailed one (``FullDescriptionEng``, falling back to
     ``FullDescription``) rendered in the ``Description`` section. Blank or
     markup-only values (``<clr><clrEnd>``) count as absent and trigger the
@@ -41,7 +46,7 @@ from pathlib import Path
 import yaml
 
 TOOL_NAME = "generate_card.py"
-TOOL_VERSION = "1.4.0"
+TOOL_VERSION = "1.6.0"
 DEFAULT_ORG = "space-rangers-mods-museum"
 RELEASE_VERSION = "v1.0.0"  # museum releases are always v1.0.0
 
@@ -85,6 +90,20 @@ def first_field(fields: dict[str, list[str]], *names: str) -> str:
         values = _meaningful(fields.get(name, []))
         if values:
             return values[0]
+    return ""
+
+
+def joined_field(fields: dict[str, list[str]], *names: str) -> str:
+    """All text occurrences of the first present field among ``names``, joined into one line.
+
+    A short description is often written as several ``Key=`` lines — the author puts a
+    clarifying note on its own line — so the card joins them into a single sentence instead
+    of keeping only the first.
+    """
+    for name in names:
+        values = _meaningful(fields.get(name, []))
+        if values:
+            return " ".join(values)
     return ""
 
 
@@ -143,12 +162,14 @@ def render_files_table(files: list[dict]) -> str:
     return "\n".join([header, separator, rows])
 
 
-def render_card(exhibit: str, acquire_block: str, manifest: dict, author: str,
+def render_card(exhibit: str, github_id: str, acquire_block: str, manifest: dict, author: str,
                 short_desc: str, full_desc: str, template: str, org: str) -> str:
     files = manifest.get("files", [])
-    archive_path = manifest.get("exhibit_archive", {}).get("path", f"{exhibit}.zip")
+    archive_path = manifest.get("exhibit_archive", {}).get("path", f"{github_id}.zip")
     archive_sha = manifest.get("exhibit_archive", {}).get("sha256", "")
-    archive_link = f"https://github.com/{org}/{exhibit}/releases/download/{RELEASE_VERSION}/{archive_path}"
+    # The release lives in the repository the archive is published to — the github_id, which
+    # carries the redux__ prefix when the mod also exists in UNI.
+    archive_link = f"https://github.com/{org}/{github_id}/releases/download/{RELEASE_VERSION}/{archive_path}"
 
     if not acquire_block.strip():
         acquire_block = "_no acquisition steps recorded_"
@@ -157,7 +178,8 @@ def render_card(exhibit: str, acquire_block: str, manifest: dict, author: str,
 
     return (
         template
-        .replace("{{EXHIBIT}}", exhibit)
+        .replace("{{EXHIBIT}}", github_id)
+        .replace("{{NAME}}", exhibit)
         .replace("{{ACQUIRE}}", acquire_block)
         .replace("{{FILES}}", files_block)
         .replace("{{ARCHIVE_PATH}}", archive_path)
@@ -184,24 +206,25 @@ def main() -> None:
     if not exhibit:
         print("ERROR: YAML is missing the 'exhibit' field")
         raise SystemExit(1)
+    github_id = (data.get("github_id") or exhibit).strip() or exhibit
     acquire_block = extract_acquire_section(Path(args.yaml), data.get("acquire") or [])
 
     with open(args.manifest, encoding="utf-8") as fh:
         manifest = json.load(fh)
     fields = read_module_info(Path(args.zip))
     author = (fields.get("Author") or [""])[0].strip()
-    short_desc = first_field(fields, "SmallDescriptionEng", "SmallDescription")
+    short_desc = joined_field(fields, "SmallDescriptionEng", "SmallDescription")
     full_desc = all_field(fields, "FullDescriptionEng", "FullDescription")
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
-        render_card(exhibit, acquire_block, manifest, author, short_desc, full_desc, template, args.org),
+        render_card(exhibit, github_id, acquire_block, manifest, author, short_desc, full_desc, template, args.org),
         encoding="utf-8",
     )
     print(f"card: {out}")
-    print(f"  exhibit: {exhibit} · author: {author or '(none found)'} · acquire section: {'yes' if acquire_block.strip() else 'no'}")
+    print(f"  exhibit: {exhibit} · github_id: {github_id} · author: {author or '(none found)'} · acquire section: {'yes' if acquire_block.strip() else 'no'}")
     print(f"  description: short={'yes' if short_desc else 'no'} · full={'yes' if full_desc else 'no'}")
 
 
