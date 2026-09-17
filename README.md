@@ -22,11 +22,13 @@ The full step-by-step workflow and tooling are documented in [workflow.md](workf
 
 ## 📚 Exhibit catalog
 
-| Mod | Author | Exhibit | Summary |
-|-----|--------|---------|---------|
-| AMod_Spacejunk | Huk | [AMod_Spacejunk](https://github.com/space-rangers-mods-museum/AMod_Spacejunk) | На форме космоса добавляется панелька-смотрелка, показывающая какой предмет и где лежит в системе |
-| LEOGraphicsMod | LEOPARD | [LEOGraphicsMod](https://github.com/space-rangers-mods-museum/LEOGraphicsMod) | Содержит в себе всю графику и звук из "Солянки" и "AnotherMods" |
-| ExpPilotBridge | Huk, 100kg, Klaxons | [ExpPilotBridge](https://github.com/space-rangers-mods-museum/ExpPilotBridge) | Добавляет функциональный капитанский мостик всем кораблям в игре |
-| UtilityFunctionsPack | Klaxons, denball | [UtilityFunctionsPack](https://github.com/space-rangers-mods-museum/UtilityFunctionsPack) | Adds a set of useful modding features |
-| AMod_MapMarker | Huk | [AMod_MapMarker](https://github.com/space-rangers-mods-museum/AMod_MapMarker) | Добавляет возможность ставить метку на систему галакарты |
-| ExpScienceRanks | Huk, 100kg, uhanich, Catarsys, Klaxons | [ExpScienceRanks](https://github.com/space-rangers-mods-museum/ExpScienceRanks) | Adds the ability to gain science titles and the unique Tick hull |
+| Mod | Author | Exhibit | Note | Summary |
+|-----|--------|---------|------|---------|
+| AMod_Spacejunk | Huk | [AMod_Spacejunk](https://github.com/space-rangers-mods-museum/AMod_Spacejunk) |  | На форме космоса добавляется панелька-смотрелка, показывающая какой предмет и где лежит в системе |
+| LEOGraphicsMod | LEOPARD | [LEOGraphicsMod](https://github.com/space-rangers-mods-museum/LEOGraphicsMod) |  | Содержит в себе всю графику и звук из "Солянки" и "AnotherMods" |
+| ExpPilotBridge | Huk, 100kg, Klaxons | [ExpPilotBridge](https://github.com/space-rangers-mods-museum/ExpPilotBridge) |  | Добавляет функциональный капитанский мостик всем кораблям в игре |
+| UtilityFunctionsPack | Klaxons, denball | [UtilityFunctionsPack](https://github.com/space-rangers-mods-museum/UtilityFunctionsPack) |  | Adds a set of useful modding features |
+| AMod_MapMarker | Huk | [AMod_MapMarker](https://github.com/space-rangers-mods-museum/AMod_MapMarker) |  | Добавляет возможность ставить метку на систему галакарты |
+| ExpScienceRanks | Huk, 100kg, uhanich, Catarsys, Klaxons | [ExpScienceRanks](https://github.com/space-rangers-mods-museum/ExpScienceRanks) |  | Adds the ability to gain science titles and the unique Tick hull |
+| ExpRC | Huk, Klaxons | [ExpRC](https://github.com/space-rangers-mods-museum/ExpRC) |  | Расширяет возможности центров рейнджеров |
+| ExpRC | Huk, Klaxons | [redux__ExpRC](https://github.com/space-rangers-mods-museum/redux__ExpRC) | ⚠️ | Warning! Untranslated staff! Expands the capabilities of Ranger Centers |
