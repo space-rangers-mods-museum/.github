@@ -139,7 +139,11 @@ e.g. `Universe Redux Fixes.7z`, which is applied on top of the unpacked pack) or
 installer `.exe`. The installer is
 opened by whichever unpacker understands it: **innoextract** (`museum/innoextract/`) covers Inno Setup
 up to ~6.2, **innounp** (`museum/innounp-2/`) up to 6.7.x — the UNI pack needs the first, the REDUX
-pack (Inno Setup 6.4.3) only the second. A typical list is
+pack (Inno Setup 6.4.3) only the second. **No archive is opened at all once the pack is unpacked**
+under `origin_artefact/unpacked/<pack>/`: that cache holds the pack with its overlays already applied,
+so every source of that pack is taken from it — the installer and the overlay archives are neither
+unpacked nor hashed (`python tools/build_unpack_cache.py <pack>` builds a cache once per pack).
+A typical list is
 the installer `.exe` first (base, has `ModuleInfo.txt`), then the update/overlay archive (its newer
 files replace the base's stale copies). Every source reports how many files it contributed — `0
 file(s)` means the archive does not touch this mod (e.g. the REDUX fixes carry no `ExpRC` files), and

@@ -9,7 +9,10 @@ part of that tree. Every source is one of:
 
   1. a .zip archive      -> read directly (stdlib)
   2. an installer .exe   -> opened with innoextract, or with innounp when the installer is
-                            newer than innoextract understands (REDUX is Inno Setup 6.4.3)
+                            newer than innoextract understands (REDUX is Inno Setup 6.4.3).
+                            A pack that is already unpacked under
+                            ``origin_artefact/unpacked/<pack>`` (installer + overlays) needs
+                            neither: every source of that pack is taken from the cache
   3. a .7z archive       -> read with py7zr; the pack overlays ("Universe Redux Fixes.7z")
                             are applied to the unpacked pack, so they come last in the list
 
@@ -55,7 +58,7 @@ import zipfile
 from pathlib import Path
 
 TOOL_NAME = "extract_exhibit.py"
-TOOL_VERSION = "0.5.0"
+TOOL_VERSION = "0.7.0"
 
 # Fixed values so the same input always yields the same exhibit zip.
 EXHIBIT_TIMESTAMP = (1980, 1, 1, 0, 0, 0)  # single normalized mtime for all entries
@@ -66,6 +69,11 @@ TOOLS_DIR = Path(__file__).resolve().parent
 # (museum/innoextract/innoextract.exe, museum/innounp-2/innounp.exe); fall back to PATH.
 MUSEUM_INNOEXTRACT = TOOLS_DIR.parent.parent / "innoextract" / "innoextract.exe"
 MUSEUM_INNOUNP = TOOLS_DIR.parent.parent / "innounp-2" / "innounp.exe"
+# Cache of fully unpacked pack installers: origin_artefact/unpacked/<pack>. Unpacking a
+# multi-gigabyte installer for every single exhibit is pointless work (and wear); the cache is
+# built once per pack and used whenever it is present — see ``unpack_cache_for``.
+ROOT_DIR = TOOLS_DIR.parent.parent.parent
+UNPACKED_DIR = ROOT_DIR / "origin_artefact" / "unpacked"
 
 
 def sha256_of(path: Path) -> str:
@@ -218,12 +226,75 @@ def _extract_exe_with_innounp(source: Path, mod_dir: str, merge_dir: Path, innou
         shutil.rmtree(exe_tmp, ignore_errors=True)
 
 
+def pack_of(source: Path) -> str | None:
+    """The pack a source archive belongs to, from its location — ``…/downloaded/<pack>/``."""
+    if source.parent.parent.name != "downloaded":
+        return None
+    return source.parent.name
+
+
+def unpack_cache_for(source: Path) -> Path | None:
+    """Return the unpacked-pack cache for a source archive, when one exists.
+
+    ``…/downloaded/<pack>/<archive>`` maps to ``origin_artefact/unpacked/<pack>``. The cache holds
+    the pack **as it is installed** — the installer's content with the pack's overlays written on
+    top — so every source of that pack is satisfied by it and neither the installer nor the overlay
+    archive is read or hashed again (SEE: the workflow's step 2).
+    """
+    pack = pack_of(source)
+    if pack is None:
+        return None
+    cache = UNPACKED_DIR / pack
+    return cache if cache.is_dir() else None
+
+
+def cache_source_hashes(cache: Path) -> dict[str, str]:
+    """Read ``<cache>/sources.txt`` — the SHA-256 of the archives the cache was built from.
+
+    The cache build records one line per archive (``<sha256>  <size>  <name>``) so the manifest can
+    still name the hash of every source without re-reading a multi-gigabyte installer. Missing or
+    unreadable file — no hashes, and the manifest simply leaves them empty.
+    """
+    listing = cache / "sources.txt"
+    if not listing.is_file():
+        return {}
+    hashes: dict[str, str] = {}
+    for line in listing.read_text(encoding="utf-8", errors="replace").splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        # Split off the hash and the size only: archive names contain spaces
+        # ("Space Rangers Universe - Update.zip").
+        parts = line.split(None, 2)
+        if len(parts) >= 3:
+            hashes[parts[2].strip()] = parts[0]
+    return hashes
+
+
+def _extract_from_unpack_cache(cache: Path, mod_dir: str, merge_dir: Path, source: Path) -> int:
+    """Copy mod_dir out of the unpacked-pack cache into merge_dir (overwriting).
+
+    The layouts seen in practice are accepted: a flattened tree with the install root at the cache
+    root, innoextract's ``app/…`` and innounp's ``{app}/…``. A cache that exists but does not hold
+    the mod folder is an error, not a reason to fall back to the archives — otherwise a wrong
+    ``target`` would silently cost a full unpack.
+    """
+    for prefix in ("", "app", "{app}"):
+        root = (cache / prefix / mod_dir) if prefix else (cache / mod_dir)
+        if root.is_dir():
+            return _copy_tree_into(root, merge_dir)
+    raise RuntimeError(
+        f"mod folder {mod_dir!r} not found in the unpacked cache {cache} "
+        f"(built from {source.name}) — fix the target or delete the cache to unpack again"
+    )
+
+
 def _extract_exe_into(source: Path, mod_dir: str, merge_dir: Path, unpackers: tuple[str, ...]) -> int:
     """Extract the mod subtree from an installer .exe into merge_dir (overwriting).
 
-    Tries every available unpacker in turn: the two cover different Inno Setup ranges
-    (innoextract up to ~6.2, innounp up to 6.7.x), so whichever understands the archive
-    wins. Raises with both errors when none of them manages it.
+    Every available unpacker is tried in turn — the two cover different Inno Setup ranges
+    (innoextract up to ~6.2, innounp up to 6.7.x), so whichever understands the archive wins — and
+    the chain raises with both errors when none of them manages it. A pack that already sits in the
+    unpacked cache never reaches this function (see ``build_exhibit``).
     """
     errors: list[str] = []
     for unpacker in unpackers:
@@ -285,9 +356,35 @@ def build_exhibit(
     source_info: list[dict] = []
     unpackers: tuple[str, ...] = ()
     try:
+        merged_caches: set[Path] = set()
         for kind, source, mod_dir, expected_sha in sources:
             if not source.exists():
                 raise RuntimeError(f"source not found: {source}")
+            cache = unpack_cache_for(source)
+            if cache is not None:
+                # The pack is already unpacked with its overlays applied, so nothing is unpacked
+                # here and no multi-gigabyte archive is hashed either — that is the whole point.
+                # Every source of that pack is covered by the single cache copy; the archives stay
+                # in the manifest as provenance, with their hashes read from the cache listing.
+                source_info.append(
+                    {
+                        "kind": kind,
+                        "archive": source.name,
+                        "path": str(source),
+                        "size": source.stat().st_size,
+                        "sha256": cache_source_hashes(cache).get(source.name, ""),
+                        "files": 0,
+                        "note": f"pack unpacked at {cache} (installer and overlays applied there)",
+                    }
+                )
+                if cache in merged_caches:
+                    print(f"  source {source.name} ({kind}) -> covered by the unpacked cache")
+                    continue
+                merged_caches.add(cache)
+                copied = _extract_from_unpack_cache(cache, mod_dir, merge_dir, source)
+                source_info[-1]["files"] = copied
+                print(f"  source {source.name} ({kind}, from the unpacked cache) -> {copied} file(s)")
+                continue
             # Optional sanity check that we are reading the expected source.
             source_sha = sha256_of(source)
             if expected_sha and source_sha != expected_sha:
