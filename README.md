@@ -32,3 +32,5 @@ The full step-by-step workflow and tooling are documented in [workflow.md](workf
 | ExpScienceRanks | Huk, 100kg, uhanich, Catarsys, Klaxons | [ExpScienceRanks](https://github.com/space-rangers-mods-museum/ExpScienceRanks) |  | Adds the ability to gain science titles and the unique Tick hull |
 | ExpRC | Huk, Klaxons | [ExpRC](https://github.com/space-rangers-mods-museum/ExpRC) |  | Расширяет возможности центров рейнджеров |
 | ExpRC | Huk, Klaxons | [redux__ExpRC](https://github.com/space-rangers-mods-museum/redux__ExpRC) | ⚠️ | Warning! Untranslated staff! Expands the capabilities of Ranger Centers |
+| ExpSkills | Huk | [ExpSkills](https://github.com/space-rangers-mods-museum/ExpSkills) |  | Дополнительные навыки |
+| ExpSkills | Huk | [redux__ExpSkills](https://github.com/space-rangers-mods-museum/redux__ExpSkills) | ⚠️ | Warning! Untranslated staff! Extra skills |
