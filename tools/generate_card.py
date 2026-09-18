@@ -53,7 +53,7 @@ import yaml
 import pack_labels
 
 TOOL_NAME = "generate_card.py"
-TOOL_VERSION = "1.6.0"
+TOOL_VERSION = "1.6.1"
 DEFAULT_ORG = "space-rangers-mods-museum"
 RELEASE_VERSION = "v1.0.0"  # museum releases are always v1.0.0
 ARCHIVE_EMOJI = "🗄️"  # heading emoji when the exhibit's pack cannot be told from its sources
@@ -69,13 +69,19 @@ _FIELD_RE = re.compile(r"^([A-Za-z0-9_]+)=(.*)$")  # a field line is `Key=Value`
 def read_module_info(zip_path: Path) -> dict[str, list[str]]:
     """Parse ModuleInfo.txt (UTF-16 LE) from the exhibit archive.
 
-    Returns field name -> ordered list of values. Fields repeat (``FullDescription``
-    appears once per paragraph), so each key maps to every occurrence. A value runs
-    from the first ``=`` to the end of the line, so it may itself contain ``=``;
-    prose lines that merely contain ``=`` are not field lines and are ignored.
+    The archive keeps the mod's path in the pack, so ModuleInfo.txt sits in
+    ``Mods/<Section>/<mod>/`` rather than at the root — the shallowest member with that name is
+    the mod's own, and is taken wherever the chain puts it. Returns field name -> ordered list of
+    values. Fields repeat (``FullDescription`` appears once per paragraph), so each key maps to
+    every occurrence. A value runs from the first ``=`` to the end of the line, so it may itself
+    contain ``=``; prose lines that merely contain ``=`` are not field lines and are ignored.
     """
     with zipfile.ZipFile(zip_path) as zf:
-        raw = zf.read("ModuleInfo.txt")
+        names = [n for n in zf.namelist() if n.replace("\\", "/").rpartition("/")[2] == "ModuleInfo.txt"]
+        if not names:
+            raise RuntimeError(f"ModuleInfo.txt not found in {zip_path}")
+        names.sort(key=lambda n: (n.count("/"), n))
+        raw = zf.read(names[0])
     fields: dict[str, list[str]] = {}
     for line in raw.decode("utf-16").splitlines():
         m = _FIELD_RE.match(line)

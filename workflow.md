@@ -147,7 +147,10 @@ commit & push).
 
 `tools/extract_exhibit.py` merges the mod folder from every entry in the `source` array into a shared
 staging area — a later source's file overwrites an earlier one with the same relative path — and
-deterministically repacks the result into a clean archive with `ModuleInfo.txt` at its root. Each
+deterministically repacks the result into a clean archive **that keeps the mod's own path in the
+pack**: the archive holds `Mods/<Section>/<mod>/…` (`ModuleInfo.txt` inside that folder), exactly the
+chain the game has, so it unpacks straight into the game folder and the section is never lost. The
+wrapper is taken from the sources' `target`, not from a separate field. Each
 source is a `zip` archive (read directly), a `.7z` archive (read with **py7zr** — the pack overlays,
 e.g. `Universe Redux Fixes.7z`, which is applied on top of the unpacked pack) or a full-game
 installer `.exe`. The installer is

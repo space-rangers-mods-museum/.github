@@ -23,11 +23,15 @@ installer first (base, contains ``ModuleInfo.txt``), then the update/overlay
 archives (their newer files replace the base's stale copies). A source that
 carries nothing for the mod contributes 0 files and is reported as such.
 
-Then we repack ONLY the mod's folder into a standalone .zip whose root is the
-mod itself (ModuleInfo.txt at the top level, no wrapper folder). Packing is
-always the same and deterministic: fixed compression level, sorted entries,
-one fixed timestamp, fixed file mode and zip metadata. Same sources + same
-arguments => byte-identical exhibit .zip every time.
+Then we repack ONLY the mod's folder into a standalone .zip, with the mod's own
+path inside the pack kept as a wrapper: the archive holds
+``Mods/<Section>/<mod>/…`` (ModuleInfo.txt inside that folder), exactly the chain
+the game has — so the archive unpacks straight into the game folder instead of
+losing the section, and two editions of the same mod from different packs cannot
+be confused. The wrapper comes from the sources' ``mod_dir``, never from an extra
+argument. Packing is always the same and deterministic: fixed compression level,
+sorted entries, one fixed timestamp, fixed file mode and zip metadata. Same
+sources + same arguments => byte-identical exhibit .zip every time.
 
 Besides the exhibit .zip we write a .manifest.json with per-file hashes, the
 SHA-256 of the final archive, and one entry per source (no separate .sha256
@@ -58,7 +62,7 @@ import zipfile
 from pathlib import Path
 
 TOOL_NAME = "extract_exhibit.py"
-TOOL_VERSION = "0.7.0"
+TOOL_VERSION = "0.8.0"
 
 # Fixed values so the same input always yields the same exhibit zip.
 EXHIBIT_TIMESTAMP = (1980, 1, 1, 0, 0, 0)  # single normalized mtime for all entries
@@ -336,21 +340,43 @@ def parse_sources(raw_sources: list[str]) -> list[tuple[str, Path, str, str | No
     return sources
 
 
+def archive_root(sources: list[tuple[str, Path, str, str | None]]) -> str:
+    """The wrapper the archive keeps — the mod's own path in the pack (``Mods/<Section>/<mod>``).
+
+    Every source of one mod names the same folder, so the first is the answer; a source that names
+    another one (a mod the pack moved between sections) is reported rather than silently ignored:
+    the base's path is the one the archive keeps, matching where ``ModuleInfo.txt`` came from.
+    """
+    roots = []
+    for _, _, mod_dir, _ in sources:
+        root = mod_dir.strip("/")
+        if root and root not in roots:
+            roots.append(root)
+    if not roots:
+        raise RuntimeError("no source names the mod's folder in the pack (mod_dir is empty)")
+    if len(roots) > 1:
+        print(f"  note: sources name different pack paths ({', '.join(roots)}) — packing under {roots[0]}")
+    return roots[0]
+
+
 def build_exhibit(
     exhibit: str,
     archive_name: str,
     sources: list[tuple[str, Path, str, str | None]],
     out_dir: Path,
 ) -> dict:
-    """Merge mod_dir from every source (later overwrites earlier) and repack flat.
+    """Merge mod_dir from every source (later overwrites earlier) and repack under its pack path.
 
     ``exhibit`` names the mod and its manifest (``<exhibit>.manifest.json``); ``archive_name``
     names the release archive (``<archive_name>.zip``). The caller passes the mod's own id for both,
     even for a duplicated mod: the pack suffix belongs to the published id — the folder and the
     GitHub repository — never to the archive, so renaming a repository cannot orphan its asset.
+    The manifest's ``files`` stay relative to the mod's folder; ``exhibit_archive.root`` says which
+    wrapper they sit under inside the archive.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     out_zip = out_dir / f"{archive_name}.zip"
+    root = archive_root(sources)
 
     merge_dir = Path(tempfile.mkdtemp(prefix="exhibit_merge_"))
     source_info: list[dict] = []
@@ -423,14 +449,15 @@ def build_exhibit(
         if not entries:
             raise RuntimeError(f"no files extracted for {exhibit}")
 
-        # Write the deterministic exhibit zip from the merged tree.
+        # Write the deterministic exhibit zip from the merged tree, each file under the mod's
+        # own pack path (``Mods/<Section>/<mod>/…``) — the chain the game expects.
         file_sizes: dict[str, int] = {}
         file_hashes: dict[str, str] = {}
         with zipfile.ZipFile(
             out_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=COMPRESS_LEVEL
         ) as zf:
             for out_name, src_path in entries:
-                zinfo = zipfile.ZipInfo(filename=out_name, date_time=EXHIBIT_TIMESTAMP)
+                zinfo = zipfile.ZipInfo(filename=f"{root}/{out_name}", date_time=EXHIBIT_TIMESTAMP)
                 zinfo.compress_type = zipfile.ZIP_DEFLATED
                 zinfo.external_attr = 0o644 << 16  # fixed unix file mode
                 zinfo.create_system = 3            # normalize cross-OS zip metadata
@@ -454,6 +481,7 @@ def build_exhibit(
             "path": out_zip.name,
             "size": out_zip.stat().st_size,
             "sha256": archive_sha,
+            "root": root,
             "entries": len(entries),
         },
         "files": [
@@ -493,6 +521,7 @@ def main() -> None:
         f"{manifest['exhibit_name']}: {manifest['exhibit_archive']['path']} "
         f"({manifest['exhibit_archive']['entries']} files, {manifest['exhibit_archive']['size']} bytes)"
     )
+    print(f"  root: {manifest['exhibit_archive']['root']}/")
     print(f"  SHA-256: {manifest['exhibit_archive']['sha256']}")
     print(f"  manifest: {Path(args.out_dir) / (manifest['exhibit_name'] + '.manifest.json')}")
 
