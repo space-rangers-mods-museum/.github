@@ -1,21 +1,22 @@
-"""Build the unpacked-pack cache used by extract_exhibit.py.
+"""Build the unpacked pack used by extract_exhibit.py.
 
 Unpacking a multi-gigabyte pack installer for every single exhibit is wasted work (and wear on the
 SSD), so a pack is unpacked **in full once** into ``origin_artefact/unpacked/<pack>`` — the
 installer's content with the pack's overlays written on top, as installing the pack does it. After
-that ``extract_exhibit.py`` satisfies every source of that pack from the cache and never touches an
-installer or an overlay archive again.
+that ``extract_exhibit.py`` satisfies every source of that pack from the unpacked tree and never
+touches an installer or an overlay archive again.
 
-    python build_unpack_cache.py uni        # or redux, Solyanka, …
+    python build_unpacked_pack.py uni        # or redux, Solyanka, …
 
 The sources are read from ``origin_artefact/downloaded/<pack>/``: the installer (``.exe``, unpacked
 with innoextract/innounp, or ``.zip``, read directly) first, then every other ``.zip``/``.7z`` in
 the folder as an overlay, in name order (a later archive wins). ``.bin`` installers' slices are
-installer parts, not overlays, and are ignored. The layout is the game root at the cache root, so a
-mod is simply ``<cache>/<target>``; ``sources.txt`` records the SHA-256 and size of every archive the
-cache was built from, which is what keeps the exhibit manifests' provenance without re-reading them.
+installer parts, not overlays, and are ignored. The layout is the game root at the unpacked root, so
+a mod is simply ``<unpacked>/<target>``; ``sources.txt`` records the SHA-256 and size of every
+archive the unpacked pack was built from, which is what keeps the exhibit manifests' provenance
+without re-reading them.
 
-A cache that already exists is left alone — delete the folder to rebuild it.
+An unpacked pack that already exists is left alone — delete the folder to rebuild it.
 """
 from __future__ import annotations
 
@@ -82,7 +83,7 @@ def unpack_installer(installer: pathlib.Path, cache: pathlib.Path) -> None:
 
 
 def flatten(cache: pathlib.Path) -> None:
-    """Lift the install root (`app` / `{app}`) up to the cache root."""
+    """Lift the install root (`app` / `{app}`) up to the unpacked root."""
     for prefix in ("app", "{app}"):
         root = cache / prefix
         if not root.is_dir():
@@ -97,11 +98,11 @@ def flatten(cache: pathlib.Path) -> None:
             moved += 1
         if not any(root.iterdir()):
             root.rmdir()
-        print(f"  flattened {prefix}/ -> the cache root ({moved} entries)")
+        print(f"  flattened {prefix}/ -> the unpacked root ({moved} entries)")
 
 
 def apply_overlay(cache: pathlib.Path, overlay: pathlib.Path) -> tuple[int, int]:
-    """Write an overlay's files over the cache; returns (added, overwritten)."""
+    """Write an overlay's files over the unpacked pack; returns (added, overwritten)."""
     added = overwritten = 0
     if overlay.suffix.lower() == ".zip":
         with zipfile.ZipFile(overlay) as archive:
@@ -136,7 +137,7 @@ def build(pack: str) -> None:
         raise SystemExit(f"pack folder not found: {pack_dir}")
     cache = UNPACKED / pack
     if cache.exists() and any(cache.iterdir()):
-        raise SystemExit(f"cache already exists: {cache} — delete it to rebuild")
+        raise SystemExit(f"unpacked pack already exists: {cache} — delete it to rebuild")
 
     installer, overlays = sources_of(pack_dir)
     print(f"building {cache}")
@@ -158,7 +159,7 @@ def build(pack: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("pack", nargs="?", help="pack folder name under origin_artefact/downloaded/")
-    parser.add_argument("--list", action="store_true", help="list the packs that have a cache")
+    parser.add_argument("--list", action="store_true", help="list the packs that are already unpacked")
     args = parser.parse_args()
     if args.list or not args.pack:
         for folder in sorted(p for p in DOWNLOADED.iterdir() if p.is_dir()):
