@@ -5,31 +5,41 @@ exhibit; each step starts only after the previous one completes.
 
 ## Two ids: `exhibit` and `github_id`
 
-An exhibit carries two ids. They differ only for mods that exist in more than one pack:
+An exhibit carries two ids:
 
-- **`exhibit`** — the mod's own id, without any prefix: the `mod_name` / `mod_museum_repo_name`
-  columns of the catalog, so the editions of one mod group together.
+- **`exhibit`** — the mod's own id, without a pack suffix: the `mod_name` / `mod_museum_repo_name`
+  columns of the catalog, so the editions of one mod group together;
 - **`github_id`** — the id the exhibit is published under: the local repository folder, the exhibit
-  archive and manifest, and the GitHub repository and release. It defaults to `exhibit`.
+  archive and manifest, and the GitHub repository and release.
 
-A mod that exists in **both UNI and REDUX** ships as two different exhibits under one name, and
-GitHub has a single namespace — so the **REDUX edition takes the `redux__` prefix**
-(`redux__ExpRC`, `redux__ExpScienceRanks`) and the UNI edition keeps the clean name. A REDUX-only
-mod collides with nothing and keeps the clean name as well.
+The published id is **derived, never chosen by hand** (`pack_labels.github_id`):
 
-Which case applies is read from [`../../info/inventory.yaml`](../../info/inventory.yaml)
-(`Solyanka` / `UNI` / `REDUX` sections): the prefix is needed exactly when the mod name appears in
-both `UNI` and `REDUX`. Decide this **before** creating the exhibit — renaming a repository later
-costs more than choosing the name right.
+- a mod the museum holds **from more than one pack** — two exhibits of one mod, the UNI edition and
+  the REDUX edition — is published as `<mod>__<pack>` for **every one of those editions**
+  (`ExpRC__uni`, `ExpRC__redux`), and **all** of them carry the ⚠️ marker in the catalog, so neither
+  edition looks like the original;
+- every other mod keeps its own id and carries no marker at all.
 
-The exhibit **folder and GitHub repository** are named after the `github_id`; the files inside keep
-the mod's own name, and only the release archive carries the published id — so a downloaded copy is
-recognisable next to its UNI twin:
+Which case applies follows from the **catalog**: `pack_labels.packs_holding()` reads the workspace's
+`info/inventory.yaml` — the generated list of every mod of every pack, where an entry's `Folder` is
+the mod's folder name and its `note` the pack it was read from — so the packs a mod ships in are the
+entries sharing that `Folder`. A mod listed under two packs is a duplicate, whether or not the museum
+has exhibited both editions yet. (Outside the workspace, where the catalog cannot be read, the
+museum's own exhibit set is the fallback.)
+
+The exhibit YAML's `github_id`, when written, is only an expectation:
+`publish_exhibit.py` **refuses** to publish when it disagrees with the derived id and
+`generate_card.py` warns — so a repository can never end up under a name the rule does not give it.
+Rename the exhibit folder to the derived id, not the other way round.
+
+The exhibit **folder and GitHub repository** are named after the `github_id`; **everything inside keeps
+the mod's own name** — the YAML, the manifest and the release archive (`ExpRC.zip`) — so renaming a
+repository (which the rule above can require) never forces its release asset to be re-uploaded:
 
 ```
-museum/redux__ExpRC/                # the folder = the repository name
-├── ExpRC.yaml                      # exhibit: ExpRC · github_id: redux__ExpRC
-├── ExpRC.manifest.json             # names the release archive (redux__ExpRC.zip)
+museum/ExpRC__redux/                # the folder = the repository name
+├── ExpRC.yaml                      # exhibit: ExpRC · published as ExpRC__redux
+├── ExpRC.manifest.json             # names the release archive (ExpRC.zip)
 ├── README.md
 └── .gitignore
 ```
@@ -77,7 +87,7 @@ Three GitHub entities in the museum — do not conflate them:
 - **Organization:** `space-rangers-mods-museum` — the museum itself; it hosts every exhibit repo and
   the showcase.
 - **Exhibit repository:** `space-rangers-mods-museum/<github_id>` — one repo per exhibit (e.g.
-  `space-rangers-mods-museum/LEOGraphicsMod`, or `space-rangers-mods-museum/redux__ExpRC` for the
+  `space-rangers-mods-museum/LEOGraphicsMod`, or `space-rangers-mods-museum/ExpRC__redux` for the
   REDUX edition of a mod that also exists in UNI); created by this workflow (step 7).
 - **Showcase repository:** `space-rangers-mods-museum/.github` — a single separate repo holding the
   shared tools, the `.csv` mod list and the main showcase page built from that `.csv`; its local
@@ -97,16 +107,20 @@ Template: `template/exhibit-input.yaml`, example: `../LEOGraphicsMod/LEOGraphics
 Excavation is a manual search; there is no intermediate notes artifact. The participant records the
 found route straight into the YAML. For each exhibit one YAML is assembled from its route:
 
-- `exhibit` — the mod's own id, without any prefix.
+- `exhibit` — the mod's own id, without a pack suffix.
 - `github_id` — the id the exhibit is published under: the repository folder, the archive and
-  manifest, and the GitHub repository. The same as `exhibit`, or `redux__<exhibit>` for the REDUX
-  edition of a mod that also exists in UNI (see the section at the top).
+  manifest, and the GitHub repository. It is **derived**, not chosen: a mod the museum holds from
+  more than one pack is published as `<mod>__<pack>` for every one of those editions, everything
+  else under the mod's own id (see the section at the top). Writing it here is optional and only an
+  expectation — the tools refuse to publish a mismatch.
 - `source` — where the files come from: an ordered array of sources, each with `kind` (`zip` archive
   or `exe` installer), `path` — a local archive (relative path resolves against this YAML) or a
   google disk link; `target` — the path to the mod folder inside the source (e.g.
   `Mods/Expansion/ExpPilotBridge`). A later source's files overwrite an earlier one's with the same
   relative path — use the installer `.exe` first (it carries `ModuleInfo.txt`), then the update
-  `.zip` (its newer files replace the base's stale copies).
+  `.zip` (its newer files replace the base's stale copies). The pack is **not** a field here: the
+  tools derive it from these paths, to put its label into the catalog note and its emoji into the
+  card heading.
 - `acquire` — each step of the chain (from the starting point to the local file) becomes a
   `ref`/`note`/`date` entry: `ref` — the step's working link, `note` — a short description
   in English (verbatim names of external resources — Discord channels, collection/mod-pack titles —
@@ -158,8 +172,10 @@ final archive, the per-file hashes, and one entry per source (there is no separa
 structure) with values from `acquire` — reproduced 1:1 as it appears in the input YAML (the
 `acquire:` key and its block, wrapped in a ```yaml fenced code block, so empty `date:` fields and
 key order are preserved) — plus the author and the descriptions from `ModuleInfo.txt`, and the
-hashes from `.manifest.json`. The card's heading is the `github_id` — so the exhibit is
-recognisable at a glance — while its `Name:` line carries the mod's own id. The short description (from
+hashes from `.manifest.json`. The card's heading is the **pack emoji plus the mod's own name**
+(`# 🛰️ ExpSkills`): the pack is derived from the `source` paths, and the `__pack` suffix of a
+`github_id` says nothing else, so it is not repeated there. The `Name:` line repeats the mod's own
+id. The short description (from
 `SmallDescriptionEng` falling back to `SmallDescription`; several `Key=` lines of it are joined into
 one message) is rendered in the `Summary` block inside
 `## 📝 Exhibit`; the detailed one (from `FullDescriptionEng` falling back to `FullDescription`) is
@@ -219,11 +235,15 @@ mod_name,mod_author,mod_museum_repo_name,mod_museum_repo_link,mod_summary,mod_gi
 Each run writes one row (mod name, author, the mod's own id, repo link, summary, the id it is
 published under, a note). `mod_museum_repo_name` holds the mod id and `mod_github_id` the repository
 id — they differ for the REDUX edition of a mod that also exists in UNI, and such a duplicate edition
-is marked with `⚠️` in `mod_note`. The marker is derived from the two ids (so it cannot drift), and a
-note written by hand is never overwritten — the tool only fills an empty cell. `mod_author` and
+is marked with `⚠️` in `mod_note`. The note is the pack label — 🥣 `solyanka`, 🪐 `uni`, 🛰️ `redux`,
+🧩 `community` — with that `⚠️` marker in front for a duplicate edition. Both parts are derived (the
+pack from the exhibit YAML's `source` paths, the marker from the two ids), so neither can drift, and
+text written by hand in the cell is kept after them. `mod_author` and
 `mod_summary`
 are read from the exhibit's generated card `README.md` (the single source of those values, in turn
-built from `ModuleInfo.txt`) — never asked on the command line. If the repository id is already in
+built from `ModuleInfo.txt`) — never asked on the command line. Rows are kept **alphabetical by the
+mod's own name**, then by the published id, so the editions of one mod sit next to each other in the
+page. If the repository id is already in
 the `.csv` the row is not duplicated; the tool only fills in gaps (including a missing
 author/summary), so it is safe to run repeatedly. The first run writes the first row. The showcase
 main page `README.md` is generated from this `.csv` (layout from `template/showcase-readme.md`) and

@@ -10,13 +10,15 @@ showcase-local step, or directly for a standalone update.
 
 The row columns (in order) are ``mod_name``, ``mod_author``,
 ``mod_museum_repo_name``, ``mod_museum_repo_link``, ``mod_summary``,
-``mod_github_id``, ``mod_note``. ``mod_museum_repo_name`` is the mod's own id (no prefix),
-``mod_github_id`` the repository/artifact id it is published under — the same
-value unless the mod also exists in UNI, in which case the REDUX edition is
-published as ``redux__<id>``. The link and the row's de-duplication key are the
-``mod_github_id``; the Exhibit column of the page shows it, and ``mod_note``
-carries the duplicate marker derived from the two ids (a hand-written note is
-never overwritten).
+``mod_github_id``, ``mod_note``. ``mod_museum_repo_name`` is the mod's own id (no suffix),
+``mod_github_id`` the repository/artifact id it is published under — derived: a
+mod that ships in more than one pack is published as ``<mod>__<pack>``
+(``ExpRC__uni``, ``ExpRC__redux``), every other mod under its own id. The link and
+the row's de-duplication key are the
+``mod_github_id``; the Exhibit column of the page links to it and shows that id
+(``[ExpRC__redux](…/ExpRC__redux)``), and ``mod_note`` carries the pack label (``🪐 uni``) plus, for
+a duplicated mod, the ⚠️ marker — both derived (the pack from the exhibit YAML's ``source`` paths,
+the marker from the packs the mod ships in). Text written by hand in that cell is kept after them.
 ``mod_author`` and
 ``mod_summary`` are read from the exhibit's generated card ``README.md`` (the
 single source of those values, in turn built from ``ModuleInfo.txt``) rather
@@ -45,8 +47,10 @@ import csv
 import re
 from pathlib import Path
 
+import pack_labels
+
 TOOL_NAME = "update_showcase.py"
-TOOL_VERSION = "1.4.0"
+TOOL_VERSION = "1.6.0"
 DEFAULT_ORG = "space-rangers-mods-museum"
 DEFAULT_HEADER = [
     "mod_name",
@@ -61,14 +65,25 @@ DEFAULT_HEADER = [
 DUPLICATE_NOTE = "⚠️"
 
 
-def note_for(mod_id: str, github_id: str) -> str:
-    """Catalog note for an exhibit — derived from its ids, so it cannot drift.
+def note_for(mod_id: str, github_id: str, pack: str = "") -> str:
+    """Catalog note of an exhibit: the pack label, plus ⚠️ when the mod has a duplicate edition.
 
-    An exhibit published under a different id than the mod's own (the REDUX edition of a mod
-    that also exists in UNI) is a duplicate, and is marked as such. A note written by hand in
-    the ``.csv`` is never overwritten — the tool only fills an empty cell.
+    Both parts are derived — the pack from the exhibit's ``source`` paths, the marker from the packs
+    the mod ships in (a mod in more than one pack is a duplicate, and **every** of its editions is
+    marked) — so the note cannot drift from the exhibit. Text written by hand in the cell is
+    preserved by :func:`merge_note`.
     """
-    return DUPLICATE_NOTE if github_id != mod_id else ""
+    parts = [DUPLICATE_NOTE] if pack_labels.is_duplicate(mod_id) else []
+    label = pack_labels.label(pack)
+    if label:
+        parts.append(label)
+    return " ".join(parts)
+
+
+def merge_note(existing: str, mod_id: str, github_id: str, pack: str) -> str:
+    """Recompose a note cell: the derived parts first, then whatever was written by hand."""
+    hand = " ".join(token for token in existing.split() if token not in pack_labels.known_tokens())
+    return " ".join(part for part in (note_for(mod_id, github_id, pack), hand) if part)
 
 TOOLS_DIR = Path(__file__).resolve().parent
 SHOWCASE_DIR = TOOLS_DIR.parent
@@ -137,10 +152,9 @@ def read_card_exhibit_summary(exhibit: str) -> tuple[str, str]:
 def build_rows_block(header: list[str], rows: list[list[str]]) -> str:
     """Render the catalog rows into the markdown table body for {{ROWS}}.
 
-    The Exhibit column shows the ``mod_github_id`` — the id the repository is
-    published under, which carries the ``redux__`` prefix for a REDUX edition of
-    a mod that also exists in UNI. Rows written before the column existed fall
-    back to the repository-name column.
+    The Exhibit column links to the repository the edition is published in — its `mod_github_id`,
+    which carries the pack suffix for a duplicated mod (`ExpRC__redux`) — and shows that id as the
+    link text: the suffix is what the ⚠️ marker and the pack label in the Note column expand on.
     """
     i_name, i_author = _col(header, "mod_name"), _col(header, "mod_author")
     i_summary = _col(header, "mod_summary")
@@ -152,11 +166,13 @@ def build_rows_block(header: list[str], rows: list[list[str]]) -> str:
         return row[i].strip() if 0 <= i < len(row) else ""
 
     def exhibit_cell(row: list[str]) -> str:
-        return cell(row, i_gh) or cell(row, i_repo)
+        label = cell(row, i_gh) or cell(row, i_repo)
+        url = cell(row, i_link) or f"https://github.com/{DEFAULT_ORG}/{label}"
+        return f"[{label}]({url})"
 
     return "\n".join(
         f"| {cell(row, i_name)} | {cell(row, i_author)} "
-        f"| [{exhibit_cell(row)}]({cell(row, i_link)}) | {cell(row, i_note)} | {cell(row, i_summary)} |"
+        f"| {exhibit_cell(row)} | {cell(row, i_note)} | {cell(row, i_summary)} |"
         for row in rows
     )
 
@@ -211,7 +227,7 @@ def _link_sub(org: str):
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--exhibit", required=True, help="museum repo id of the exhibit — the github_id (folder + repository name)")
-    parser.add_argument("--mod-id", help="the mod's own id, without the redux__ prefix (default: same as --exhibit)")
+    parser.add_argument("--mod-id", help="the mod's own id, without the pack suffix (default: same as --exhibit)")
     parser.add_argument("--name", help="display mod name (default: the mod id)")
     parser.add_argument("--org", default=DEFAULT_ORG, help=f"museum org (default: {DEFAULT_ORG})")
     parser.add_argument("--csv", default=str(SHOWCASE_DIR / "exhibits.csv"), help="path to the museum mod list .csv")
@@ -225,6 +241,14 @@ def main() -> None:
         raise SystemExit(1)
     mod_id = (args.mod_id or exhibit).strip() or exhibit
     name = (args.name or mod_id).strip() or mod_id
+    # The published id is derived, not taken on trust: a mod the museum holds from more than one
+    # pack is published as `<mod>__<pack>` for every one of those editions. `--exhibit` names the
+    # exhibit's museum folder — where its YAML and its card are read from.
+    folder = exhibit
+    pack = pack_labels.pack_of_exhibit(folder, mod_id)
+    if pack_labels.github_id(mod_id, pack) != exhibit:
+        exhibit = pack_labels.github_id(mod_id, pack)
+        print(f"showcase: the folder is {folder!r}, the mod is published as {exhibit!r} — rename the folder to match")
     link = f"https://github.com/{args.org}/{exhibit}"
 
     csv_path = Path(args.csv)
@@ -256,17 +280,32 @@ def main() -> None:
             if not row[i_summary].strip():
                 row[i_summary] = summary
 
-    # Fill in a missing duplicate marker — derived from the ids, so it cannot drift from the
-    # catalog; a note already written by hand is left alone.
-    if i_note >= 0:
-        for row in rows:
-            if not row[i_note].strip():
-                row[i_note] = note_for(row[i_repo].strip(), row[i_gh].strip() or row[i_repo].strip())
+    # Recompute the derived parts of every row: the pack (from the exhibit YAML's source paths),
+    # the published id — `<mod>__<pack>` for a mod that ships in more than one pack — its link, and
+    # the note cell. Text written by hand in the note survives after them. A row whose exhibit
+    # cannot be found at all (its folder is gone) is left untouched.
+    derived_ids: set[str] = set()
+    for row in rows:
+        row_mod_id = row[i_repo].strip()
+        if not row_mod_id:
+            continue
+        stored_id = row[i_gh].strip() or row_mod_id
+        pack = pack_labels.pack_for_exhibit(row_mod_id, stored_id)
+        if not pack:
+            derived_ids.add(stored_id)
+            continue
+        row_github_id = pack_labels.github_id(row_mod_id, pack)
+        derived_ids.add(row_github_id)
+        if row_github_id != row[i_gh].strip():
+            row[i_gh] = row_github_id
+            row[i_link] = f"https://github.com/{args.org}/{row_github_id}"
+        if i_note >= 0:
+            row[i_note] = merge_note(row[i_note], row_mod_id, row_github_id, pack)
 
-    # Append a new row if the exhibit is not yet catalogued — keyed by its github_id, falling
-    # back to the mod-id column so rows written before the github_id column existed still match.
-    if not any(row[i_gh].strip() == exhibit or row[i_repo].strip() == exhibit for row in rows):
-        author, summary = read_card_exhibit_summary(exhibit)
+    # Append a new row if this exhibit is not yet catalogued. The key is the published id — matching
+    # by the mod id would fuse the two editions of a duplicated mod into one row.
+    if exhibit not in derived_ids:
+        author, summary = read_card_exhibit_summary(folder)
         row = [""] * len(header)
         row[_col(header, "mod_name")] = name
         row[i_author] = author
@@ -275,9 +314,14 @@ def main() -> None:
         row[i_gh] = exhibit
         row[i_link] = link
         if i_note >= 0:
-            row[i_note] = note_for(mod_id, exhibit)
+            row[i_note] = note_for(mod_id, exhibit, pack)
         rows.append(row)
         print(f"showcase: adding row {name!r} (mod id {mod_id}, github_id {exhibit})")
+
+    # Keep the catalog alphabetical by the mod's own name, then by the published id: the editions of
+    # one mod (its duplicates) land next to each other, which is the point of the ⚠️ marker and the
+    # pack label beside them.
+    rows.sort(key=lambda row: (row[i_repo].strip().lower(), row[i_gh].strip()))
 
     save_rows(csv_path, header, rows)
 

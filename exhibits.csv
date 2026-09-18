@@ -1,9 +1,11 @@
 mod_name,mod_author,mod_museum_repo_name,mod_museum_repo_link,mod_summary,mod_github_id,mod_note
-AMod_Spacejunk,Huk,AMod_Spacejunk,https://github.com/space-rangers-mods-museum/AMod_Spacejunk,"На форме космоса добавляется панелька-смотрелка, показывающая какой предмет и где лежит в системе",AMod_Spacejunk,
-LEOGraphicsMod,LEOPARD,LEOGraphicsMod,https://github.com/space-rangers-mods-museum/LEOGraphicsMod,"Содержит в себе всю графику и звук из ""Солянки"" и ""AnotherMods""",LEOGraphicsMod,
-ExpPilotBridge,"Huk, 100kg, Klaxons",ExpPilotBridge,https://github.com/space-rangers-mods-museum/ExpPilotBridge,Добавляет функциональный капитанский мостик всем кораблям в игре,ExpPilotBridge,
-UtilityFunctionsPack,"Klaxons, denball",UtilityFunctionsPack,https://github.com/space-rangers-mods-museum/UtilityFunctionsPack,Adds a set of useful modding features,UtilityFunctionsPack,
-AMod_MapMarker,Huk,AMod_MapMarker,https://github.com/space-rangers-mods-museum/AMod_MapMarker,Добавляет возможность ставить метку на систему галакарты,AMod_MapMarker,
-ExpScienceRanks,"Huk, 100kg, uhanich, Catarsys, Klaxons",ExpScienceRanks,https://github.com/space-rangers-mods-museum/ExpScienceRanks,Adds the ability to gain science titles and the unique Tick hull,ExpScienceRanks,
-ExpRC,"Huk, Klaxons",ExpRC,https://github.com/space-rangers-mods-museum/redux__ExpRC,Warning! Untranslated staff! Expands the capabilities of Ranger Centers,redux__ExpRC,⚠️
-ExpSkills,Huk,ExpSkills,https://github.com/space-rangers-mods-museum/redux__ExpSkills,Warning! Untranslated staff! Extra skills,redux__ExpSkills,⚠️
+AMod_MapMarker,Huk,AMod_MapMarker,https://github.com/space-rangers-mods-museum/AMod_MapMarker,Добавляет возможность ставить метку на систему галакарты,AMod_MapMarker,🥣 solyanka
+AMod_Spacejunk,Huk,AMod_Spacejunk,https://github.com/space-rangers-mods-museum/AMod_Spacejunk,"На форме космоса добавляется панелька-смотрелка, показывающая какой предмет и где лежит в системе",AMod_Spacejunk,🥣 solyanka
+DenButtonsPack,denball,DenButtonsPack,https://github.com/space-rangers-mods-museum/DenButtonsPack,Safe to use Adds button graphics that can be used in other mods,DenButtonsPack,🛰️ redux
+DenSettingsControl,denball,DenSettingsControl,https://github.com/space-rangers-mods-museum/DenSettingsControl,Safe to use Adds a panel for editing settings of game,DenSettingsControl,🛰️ redux
+ExpPilotBridge,"Huk, 100kg, Klaxons",ExpPilotBridge,https://github.com/space-rangers-mods-museum/ExpPilotBridge__uni,Добавляет функциональный капитанский мостик всем кораблям в игре,ExpPilotBridge__uni,⚠️ 🪐 uni
+ExpRC,"Huk, Klaxons",ExpRC,https://github.com/space-rangers-mods-museum/ExpRC__redux,Warning! Untranslated staff! Expands the capabilities of Ranger Centers,ExpRC__redux,⚠️ 🛰️ redux
+ExpScienceRanks,"Huk, 100kg, uhanich, Catarsys, Klaxons",ExpScienceRanks,https://github.com/space-rangers-mods-museum/ExpScienceRanks__uni,Adds the ability to gain science titles and the unique Tick hull,ExpScienceRanks__uni,⚠️ 🪐 uni
+ExpSkills,Huk,ExpSkills,https://github.com/space-rangers-mods-museum/ExpSkills__redux,Warning! Untranslated staff! Extra skills,ExpSkills__redux,⚠️ 🛰️ redux
+LEOGraphicsMod,LEOPARD,LEOGraphicsMod,https://github.com/space-rangers-mods-museum/LEOGraphicsMod,"Содержит в себе всю графику и звук из ""Солянки"" и ""AnotherMods""",LEOGraphicsMod,🥣 solyanka
+UtilityFunctionsPack,"Klaxons, denball",UtilityFunctionsPack,https://github.com/space-rangers-mods-museum/UtilityFunctionsPack__uni,Adds a set of useful modding features,UtilityFunctionsPack__uni,⚠️ 🪐 uni

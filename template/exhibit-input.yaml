@@ -2,8 +2,10 @@
 # Schema in design.md, section "Input: YAML per exhibit".
 
 exhibit: <id>      # mod id (no prefix) — the mod's own name: the mod_name column and the card heading
-github_id: <id>    # repository / folder / artifact id — the SAME as exhibit, unless this mod also exists in
-                   # UNI: then the REDUX edition takes the redux__ prefix (e.g. redux__ExpRC) — see workflow.md
+github_id: <id>    # optional expectation of the published id. It is DERIVED (see workflow.md, "Two ids"):
+                   # a mod the museum holds from more than one pack is published as <pack>__<mod>
+                   # (uni__ExpRC, redux__ExpRC), everything else under its own id; publish_exhibit.py
+                   # refuses to run if this line disagrees with the derived id
 
 # internal — input for extract_exhibit.py, NOT shown on the card
 # an ORDERED list: a later source's files OVERWRITE an earlier one's with the same relative

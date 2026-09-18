@@ -41,7 +41,7 @@ Usage
         --out-dir ../../ExpPilotBridge
 
     # a duplicate edition: the archive carries the published id, the manifest the mod's own
-    python extract_exhibit.py --exhibit ExpRC --archive-name redux__ExpRC --source '...' --out-dir ../../redux__ExpRC
+    python extract_exhibit.py --exhibit ExpRC --archive-name ExpRC__redux --source '...' --out-dir ../../ExpRC__redux
 
     # optionally pin a source so a wrong archive fails loudly:
     --source '{"kind":"zip","path":"x.zip","mod_dir":"Mods/x","sha256":"42a7..."}'
@@ -345,9 +345,9 @@ def build_exhibit(
     """Merge mod_dir from every source (later overwrites earlier) and repack flat.
 
     ``exhibit`` names the mod and its manifest (``<exhibit>.manifest.json``); ``archive_name``
-    names the release archive (``<archive_name>.zip``). They differ for a duplicate edition:
-    the REDUX exhibit of a mod that also exists in UNI is published as ``redux__<id>`` so the
-    download is recognisable, while the manifest and the YAML keep the mod's own name.
+    names the release archive (``<archive_name>.zip``). The caller passes the mod's own id for both,
+    even for a duplicated mod: the pack suffix belongs to the published id — the folder and the
+    GitHub repository — never to the archive, so renaming a repository cannot orphan its asset.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     out_zip = out_dir / f"{archive_name}.zip"
@@ -470,7 +470,7 @@ def build_exhibit(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--exhibit", required=True, help="exhibit / mod id — names the manifest (and the exhibit in the manifest)")
-    parser.add_argument("--archive-name", help="name of the release archive (default: the exhibit id); differs only for a duplicate edition, e.g. redux__ExpRC")
+    parser.add_argument("--archive-name", help="name of the release archive (default: the exhibit id); differs only for a duplicate edition, e.g. ExpRC__redux")
     parser.add_argument(
         "--source",
         action="append",

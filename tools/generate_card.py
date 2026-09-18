@@ -7,11 +7,16 @@ repository in the museum carries:
 
   * the exhibit YAML (the ``acquire`` section — the ordered chain of how the
     local archive was obtained, reproduced verbatim as it appears in the input
-    YAML; and ``github_id`` — the repository/artifact id, which equals
-    ``exhibit`` unless the mod also exists in UNI, in which case the REDUX
-    edition carries the ``redux__`` prefix. The id heads the card and names the
-    archive and the release URL, while the ``Name:`` line keeps the mod's own
-    name — the exhibit is distinguishable, the mod is still called what it is);
+    YAML; and the ``source`` paths, from which the pack is derived). The
+    published id is **derived, never read from the YAML**: a mod the museum holds
+    from more than one pack is published as ``<mod>__<pack>`` for every one of
+    those editions (``ExpRC__uni``, ``ExpRC__redux``), every other mod under its
+    own id. The id names the repository and the release URL, while the heading
+    carries the pack emoji and the mod's own name (``# 🛰️ ExpSkills`` — the pack
+    is the only thing the prefix ever said) and the ``Name:`` line repeats the
+    mod's name. The release archive keeps the mod's own name too
+    (``ExpSkills.zip``), so renaming a repository never forces its asset to be
+    re-uploaded);
   * the ``.manifest.json`` produced by ``extract_exhibit.py`` — per-file
     SHA-256 hashes and the SHA-256 of the final archive;
   * ``ModuleInfo.txt`` inside the exhibit archive — the ``Author=`` field (for
@@ -45,10 +50,13 @@ from pathlib import Path
 
 import yaml
 
+import pack_labels
+
 TOOL_NAME = "generate_card.py"
 TOOL_VERSION = "1.6.0"
 DEFAULT_ORG = "space-rangers-mods-museum"
 RELEASE_VERSION = "v1.0.0"  # museum releases are always v1.0.0
+ARCHIVE_EMOJI = "🗄️"  # heading emoji when the exhibit's pack cannot be told from its sources
 
 TOOLS_DIR = Path(__file__).resolve().parent
 TEMPLATE_PATH = TOOLS_DIR.parent / "template" / "exhibit-card.md"
@@ -163,12 +171,13 @@ def render_files_table(files: list[dict]) -> str:
 
 
 def render_card(exhibit: str, github_id: str, acquire_block: str, manifest: dict, author: str,
-                short_desc: str, full_desc: str, template: str, org: str) -> str:
+                short_desc: str, full_desc: str, template: str, org: str,
+                pack_emoji: str = ARCHIVE_EMOJI) -> str:
     files = manifest.get("files", [])
-    archive_path = manifest.get("exhibit_archive", {}).get("path", f"{github_id}.zip")
+    archive_path = manifest.get("exhibit_archive", {}).get("path", f"{exhibit}.zip")
     archive_sha = manifest.get("exhibit_archive", {}).get("sha256", "")
     # The release lives in the repository the archive is published to — the github_id, which
-    # carries the redux__ prefix when the mod also exists in UNI.
+    # carries the pack suffix when the mod ships in another pack too.
     archive_link = f"https://github.com/{org}/{github_id}/releases/download/{RELEASE_VERSION}/{archive_path}"
 
     if not acquire_block.strip():
@@ -178,7 +187,7 @@ def render_card(exhibit: str, github_id: str, acquire_block: str, manifest: dict
 
     return (
         template
-        .replace("{{EXHIBIT}}", github_id)
+        .replace("{{PACK_EMOJI}}", pack_emoji)
         .replace("{{NAME}}", exhibit)
         .replace("{{ACQUIRE}}", acquire_block)
         .replace("{{FILES}}", files_block)
@@ -206,7 +215,14 @@ def main() -> None:
     if not exhibit:
         print("ERROR: YAML is missing the 'exhibit' field")
         raise SystemExit(1)
-    github_id = (data.get("github_id") or exhibit).strip() or exhibit
+    github_id = (data.get("github_id") or "").strip()
+    pack = pack_labels.pack_of_sources(data.get("source"))
+    derived_id = pack_labels.github_id(exhibit, pack)
+    if github_id and github_id != derived_id:
+        print(f"WARNING: the YAML says github_id {github_id!r}, but {exhibit} from "
+              f"{pack or 'an unknown pack'} is published as {derived_id!r} — using the derived id")
+    github_id = derived_id
+    pack_emoji = pack_labels.emoji(pack) or ARCHIVE_EMOJI
     acquire_block = extract_acquire_section(Path(args.yaml), data.get("acquire") or [])
 
     with open(args.manifest, encoding="utf-8") as fh:
@@ -220,11 +236,14 @@ def main() -> None:
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
-        render_card(exhibit, github_id, acquire_block, manifest, author, short_desc, full_desc, template, args.org),
+        render_card(exhibit, github_id, acquire_block, manifest, author, short_desc, full_desc, template, args.org,
+                    pack_emoji),
         encoding="utf-8",
     )
     print(f"card: {out}")
-    print(f"  exhibit: {exhibit} · github_id: {github_id} · author: {author or '(none found)'} · acquire section: {'yes' if acquire_block.strip() else 'no'}")
+    # The pack is reported by name, not by its emoji: the console may be a legacy code page that
+    # cannot encode it (the card itself is always written as UTF-8).
+    print(f"  exhibit: {exhibit} · github_id: {github_id} · pack: {pack or '(unknown)'} · author: {author or '(none found)'} · acquire section: {'yes' if acquire_block.strip() else 'no'}")
     print(f"  description: short={'yes' if short_desc else 'no'} · full={'yes' if full_desc else 'no'}")
 
 

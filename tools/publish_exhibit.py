@@ -27,13 +27,15 @@ a log line for every step and stopping on the first failed step:
   9. commit & push the showcase changes (``git add/commit/push`` in ``.github``)
      — only after step 7 succeeded, so the pushed page links to a live repo.
 
-The exhibit is published under its ``github_id`` — the YAML field of the same
-name, defaulting to ``exhibit``. It names the local repository folder, the
-release archive and the GitHub repository; the manifest and the YAML keep the
-mod's own name (``<exhibit>.manifest.json`` / ``<exhibit>.yaml``). The id
-differs from ``exhibit``
-only for a REDUX edition of a mod that also exists in UNI, which takes the
-``redux__`` prefix (e.g. ``redux__ExpRC``); the mod's own id stays unprefixed.
+The exhibit is published under a **derived** id, never one written in the YAML:
+a mod the museum holds from more than one pack is published as ``<mod>__<pack>``
+for every one of those editions (``ExpRC__uni``, ``ExpRC__redux`` — both marked as
+duplicates in the showcase), every other mod under its own id. The id names the
+local repository folder and the GitHub repository; **everything inside keeps the
+mod's own name** (``<exhibit>.yaml``, ``<exhibit>.manifest.json`` and the release
+asset ``<exhibit>.zip``), so renaming a repository never forces its release asset
+to be re-uploaded. A ``github_id`` field in the YAML is only an expectation: a
+mismatch is an error, so a wrongly named repository can never be created.
 
 Pass ``--no-publish`` to run steps 1-6 only (extract -> card -> repo-folder ->
 local git init -> showcase local update) without touching ``gh`` or the remote —
@@ -62,6 +64,7 @@ from pathlib import Path
 
 import yaml
 
+import pack_labels
 from generate_card import joined_field, read_module_info
 
 TOOL_NAME = "publish_exhibit.py"
@@ -145,15 +148,24 @@ def main() -> None:
     if not exhibit:
         print("ERROR: YAML is missing the 'exhibit' field")
         raise SystemExit(1)
-    # The id the exhibit is published under. It equals ``exhibit``, unless the mod also exists
-    # in UNI — then the REDUX edition carries the ``redux__`` prefix. It names the repository
-    # folder, the archive/manifest and the GitHub repository.
-    github_id = (data.get("github_id") or exhibit).strip() or exhibit
+    # The id the exhibit is published under — derived, never taken from the YAML: a mod the museum
+    # holds from more than one pack is published as ``<mod>__<pack>`` for EVERY one of those
+    # editions, every other mod under its own id. It names the repository folder, the archive and
+    # the GitHub repository. A ``github_id`` in the YAML is only an expectation and must agree, so
+    # a wrongly named repository can never be created.
     source = data.get("source") or []
     if isinstance(source, dict):
         source = [source]
     if not isinstance(source, list) or not source:
         print("ERROR: YAML 'source' must be a dict or a non-empty list of source dicts")
+        raise SystemExit(1)
+    pack = pack_labels.pack_of_sources(source)
+    github_id = pack_labels.github_id(exhibit, pack)
+    stated_id = (data.get("github_id") or "").strip()
+    if stated_id and stated_id != github_id:
+        print(f"ERROR: the YAML says github_id {stated_id!r}, but {exhibit!r} from "
+              f"{pack or 'an unknown pack'} is published as {github_id!r} — "
+              f"rename the exhibit folder to match and drop the field")
         raise SystemExit(1)
 
     # Default out-dir: the museum working dir (parent of the .github showcase repo),
@@ -183,11 +195,14 @@ def main() -> None:
             spec["sha256"] = str(src["sha256"]).strip()
         source_specs.append(spec)
 
-    # 2. Extract and repack (later sources overwrite earlier ones in the merge).
+    # 2. Extract and repack (later sources overwrite earlier ones in the merge). The archive keeps
+    #    the MOD's own name, never the suffixed published id: the release asset of both editions of
+    #    a duplicated mod stays `<mod>.zip` (they live in different repositories), so renaming a
+    #    repository never forces its release asset to be re-uploaded.
     extract_argv = [
         sys.executable, str(TOOLS_DIR / "extract_exhibit.py"),
         "--exhibit", exhibit,
-        "--archive-name", github_id,
+        "--archive-name", exhibit,
         "--out-dir", str(out_dir),
     ]
     for spec in source_specs:
@@ -202,7 +217,7 @@ def main() -> None:
             sys.executable, str(TOOLS_DIR / "generate_card.py"),
             "--yaml", str(Path(args.yaml_path)),
             "--manifest", str(out_dir / f"{exhibit}.manifest.json"),
-            "--zip", str(out_dir / f"{github_id}.zip"),
+            "--zip", str(out_dir / f"{exhibit}.zip"),
             "--out", str(out_dir / "README.md"),
             "--org", args.org,
         ],
@@ -271,7 +286,7 @@ def main() -> None:
     #    description, so the new repo is not an empty "No description"
     #    placeholder. GitHub caps descriptions at 350 chars, so the summary is
     #    truncated to fit.
-    summary = joined_field(read_module_info(out_dir / f"{github_id}.zip"), "SmallDescriptionEng", "SmallDescription")
+    summary = joined_field(read_module_info(out_dir / f"{exhibit}.zip"), "SmallDescriptionEng", "SmallDescription")
     create_cmd = ["gh", "repo", "create", f"{args.org}/{github_id}", "--public", "--source", str(out_dir), "--push"]
     if summary:
         create_cmd += ["--description", summary[:350]]
@@ -284,12 +299,12 @@ def main() -> None:
     run_step(
         log_path,
         "gh-release",
-        ["gh", "release", "create", RELEASE_VERSION, "--repo", f"{args.org}/{github_id}", "--title", github_id, str(out_dir / f"{github_id}.zip")],
+        ["gh", "release", "create", RELEASE_VERSION, "--repo", f"{args.org}/{github_id}", "--title", github_id, str(out_dir / f"{exhibit}.zip")],
     )
 
     #    The archive now lives as the GitHub release asset — remove the local
     #    copy so it does not linger in the repo folder as a source file.
-    (out_dir / f"{github_id}.zip").unlink(missing_ok=True)
+    (out_dir / f"{exhibit}.zip").unlink(missing_ok=True)
 
     # 9. Showcase — commit & push. Side-effect step: the updated ``exhibits.csv``
     #    and main page (step 6) point to the exhibit repo, which now exists after

@@ -1,4 +1,4 @@
-# 🗄️ {{EXHIBIT}}
+# {{PACK_EMOJI}} {{NAME}}
 
 * **Name:** {{NAME}}
 * **Author:** {{AUTHOR}}
