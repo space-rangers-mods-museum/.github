@@ -47,11 +47,15 @@ def sha256_of(path: pathlib.Path) -> str:
 
 def sources_of(pack_dir: pathlib.Path) -> tuple[pathlib.Path, list[pathlib.Path]]:
     """The installer and the overlay archives of a downloaded pack, in application order."""
-    installers = [p for p in sorted(pack_dir.iterdir())
+    candidates = [p for p in sorted(pack_dir.iterdir())
                   if p.is_file() and p.suffix.lower() in (".exe", ".zip")]
-    if not installers:
+    if not candidates:
         raise SystemExit(f"no installer (.exe/.zip) found in {pack_dir}")
-    installer, *rest = installers
+    # A pack's installer is its .exe whenever it ships one; a .zip is the installer only for the
+    # packs distributed as zips (Solyanka). Otherwise an update/overlay zip whose name sorts before
+    # the .exe (" " < "_") would be taken as the installer and the real one would be dropped from
+    # the overlays entirely (their suffix set is .zip/.7z).
+    installer = next((p for p in candidates if p.suffix.lower() == ".exe"), candidates[0])
     overlays = [p for p in sorted(pack_dir.iterdir())
                 if p.is_file() and p.suffix.lower() in (".zip", ".7z") and p != installer]
     return installer, overlays
