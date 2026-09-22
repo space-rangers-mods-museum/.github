@@ -71,6 +71,10 @@ TOOL_NAME = "publish_exhibit.py"
 TOOL_VERSION = "1.6.0"
 DEFAULT_ORG = "space-rangers-mods-museum"
 RELEASE_VERSION = "v1.0.0"  # archive versioning is out of scope — always v1.0.0
+# A release note is passed explicitly: without ``--notes``, ``gh release create`` opens an
+# interactive prompt for the title and the notes — and then hangs in a non-TTY (or blocks a
+# human's terminal). The text is fixed, so every exhibit's release carries the same one.
+RELEASE_NOTES = "Museum archive of the original release — see the README for the acquisition route and per-file hashes."
 
 TOOLS_DIR = Path(__file__).resolve().parent
 SHOWCASE_DIR = TOOLS_DIR.parent  # museum/.github — the showcase repo local working copy
@@ -292,14 +296,16 @@ def main() -> None:
         create_cmd += ["--description", summary[:350]]
     run_step(log_path, "gh-create-repo", create_cmd)
 
-    # 8. Publish the archive as a release (version always v1.0.0, title = exhibit).
+    # 8. Publish the archive as a release (version always v1.0.0, title = the mod's own
+    #    name ``exhibit`` — never the pack-suffixed ``github_id``, which names the repo
+    #    and the folder but not the release; every existing exhibit follows this).
     #    ``--repo`` pins the release to the exhibit repo: without it ``gh`` targets
     #    the repo of the current directory, which for this tool is the showcase
     #    ``.github`` working copy — the archive would ship to the wrong repo.
     run_step(
         log_path,
         "gh-release",
-        ["gh", "release", "create", RELEASE_VERSION, "--repo", f"{args.org}/{github_id}", "--title", github_id, str(out_dir / f"{exhibit}.zip")],
+        ["gh", "release", "create", RELEASE_VERSION, "--repo", f"{args.org}/{github_id}", "--title", exhibit, "--notes", RELEASE_NOTES, str(out_dir / f"{exhibit}.zip")],
     )
 
     #    The archive now lives as the GitHub release asset — remove the local

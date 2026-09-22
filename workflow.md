@@ -9,8 +9,9 @@ An exhibit carries two ids:
 
 - **`exhibit`** — the mod's own id, without a pack suffix: the `mod_name` / `mod_museum_repo_name`
   columns of the catalog, so the editions of one mod group together;
-- **`github_id`** — the id the exhibit is published under: the local repository folder, the exhibit
-  archive and manifest, and the GitHub repository and release.
+- **`github_id`** — the id the exhibit is published under: the local repository folder and the GitHub
+  repository. Only those two: everything inside keeps the mod's own name (above), and the release
+  title is the mod's own name too.
 
 The published id is **derived, never chosen by hand** (`pack_labels.github_id`):
 
@@ -48,7 +49,7 @@ museum/ExpRC__redux/                # the folder = the repository name
 
 | input                                                   | command                                                   | output                                                                                                       |
 |---------------------------------------------------------|-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
-| filled `../<github_id>/<exhibit>.yaml` (`source` + `acquire`) | `python tools/publish_exhibit.py ../<github_id>/<exhibit>.yaml` | exhibit repo `space-rangers-mods-museum/<github_id>` created + pushed; release `v1.0.0` (title = the github_id) |
+| filled `../<github_id>/<exhibit>.yaml` (`source` + `acquire`) | `python tools/publish_exhibit.py ../<github_id>/<exhibit>.yaml` | exhibit repo `space-rangers-mods-museum/<github_id>` created + pushed; release `v1.0.0` (title = the mod's own name, `exhibit`) |
 
 ## Step by step
 
@@ -64,12 +65,12 @@ nested inside the showcase repo.
 | step                          | phase     | input                                                          | command                                                                                                                                                             | output                                                                         |
 |-------------------------------|-----------|----------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
 | 1. Input — exhibit YAML       | safe      | manual excavation (link chains, Discord channels, dates)       | *(manual)* copy `template/exhibit-input.yaml` → fill `../<github_id>/<exhibit>.yaml`                                                                                          | YAML with `exhibit` + `github_id` + `source` + `acquire`                       |
-| 2. Extract & repack           | safe      | `source` (ordered array: each entry `kind`/`path`/`target`)    | `python tools/extract_exhibit.py --exhibit <exhibit> --archive-name <github_id> --source '{"kind":"exe","path":<installer>,"target":<mod folder>}' --source '{"kind":"zip","path":<update.zip>,"target":<mod folder>}' --out-dir <out-dir>` | `<github_id>.zip`, `<exhibit>.manifest.json` (archive hash + per-file hashes)   |
-| 3. Card                       | safe      | YAML + `.manifest.json` + `.zip`                               | `python tools/generate_card.py --yaml ../<github_id>/<exhibit>.yaml --manifest <out-dir>/<exhibit>.manifest.json --zip <out-dir>/<github_id>.zip --out <out-dir>/README.md` | `README.md` (acquire route + author + descriptions + hashes)                  |
+| 2. Extract & repack           | safe      | `source` (ordered array: each entry `kind`/`path`/`target`)    | `python tools/extract_exhibit.py --exhibit <exhibit> --archive-name <exhibit> --source '{"kind":"exe","path":<installer>,"target":<mod folder>}' --source '{"kind":"zip","path":<update.zip>,"target":<mod folder>}' --out-dir <out-dir>` | `<exhibit>.zip`, `<exhibit>.manifest.json` (archive hash + per-file hashes)   |
+| 3. Card                       | safe      | YAML + `.manifest.json` + `.zip`                               | `python tools/generate_card.py --yaml ../<github_id>/<exhibit>.yaml --manifest <out-dir>/<exhibit>.manifest.json --zip <out-dir>/<exhibit>.zip --out <out-dir>/README.md` | `README.md` (acquire route + author + descriptions + hashes)                  |
 | 4. Local repository           | safe      | artifacts of steps 2–3                                        | `python tools/publish_exhibit.py ../<github_id>/<exhibit>.yaml --no-publish` (runs steps 2–6)                                                                              | repo folder `<out-dir>`: `README.md`, `<exhibit>.yaml`, `<exhibit>.manifest.json`, `.gitignore` |
 | 5. Local git repository       | safe      | repo folder (step 4)                                          | `git -C <out-dir> init` + `git -C <out-dir> add -A` + `git -C <out-dir> commit -m "Add <github_id> exhibit"` (done by the orchestrator in the same `--no-publish` run) | local git repo at `<out-dir>` with the initial commit — no remote yet          |
 | 6. Showcase — local update    | safe      | github_id (+ the mod id)                                      | `python tools/update_showcase.py --exhibit <github_id> --mod-id <exhibit>` (called by the orchestrator as the `showcase-local` step)                                  | `.csv` row + main page rebuilt in `museum/.github` (local, not yet pushed)     |
-| 7. Publish exhibit repo via gh| side-effect | `<out-dir>` folder                                          | `gh repo create space-rangers-mods-museum/<github_id> --public --source <out-dir> --push` then `gh release create v1.0.0 --title "<github_id>" <out-dir>/<github_id>.zip` | exhibit repo `space-rangers-mods-museum/<github_id>` live; `.zip` uploaded as release asset, then removed locally |
+| 7. Publish exhibit repo via gh| side-effect | `<out-dir>` folder                                          | `gh repo create space-rangers-mods-museum/<github_id> --public --source <out-dir> --push` then `gh release create v1.0.0 --title "<exhibit>" --notes "<text>" <out-dir>/<exhibit>.zip` | exhibit repo `space-rangers-mods-museum/<github_id>` live; `.zip` uploaded as release asset, then removed locally |
 | 8. Showcase — commit & push   | side-effect | updated `museum/.github` (step 6)                            | `git add/commit/push` in `museum/.github` (done by the orchestrator after step 7 as `showcase-add`/`showcase-commit`/`showcase-push`)                                   | showcase repo `space-rangers-mods-museum/.github` live                        |
 
 ```
@@ -108,8 +109,9 @@ Excavation is a manual search; there is no intermediate notes artifact. The part
 found route straight into the YAML. For each exhibit one YAML is assembled from its route:
 
 - `exhibit` — the mod's own id, without a pack suffix.
-- `github_id` — the id the exhibit is published under: the repository folder, the archive and
-  manifest, and the GitHub repository. It is **derived**, not chosen: a mod the museum holds from
+- `github_id` — the id the exhibit is published under: the repository folder and the GitHub
+  repository (the archive, the manifest and the release title keep the mod's own name). It is
+  **derived**, not chosen: a mod the museum holds from
   more than one pack is published as `<mod>__<pack>` for every one of those editions, everything
   else under the mod's own id (see the section at the top). Writing it here is optional and only an
   expectation — the tools refuse to publish a mismatch.
@@ -166,7 +168,7 @@ files replace the base's stale copies). Every source reports how many files it c
 file(s)` means the archive does not touch this mod (e.g. the REDUX fixes carry no `ExpRC` files), and
 the exhibit then equals the content of the sources that do.
 
-Artifacts: `<github_id>.zip`, `<exhibit>.manifest.json` — the manifest carries the SHA-256 of the
+Artifacts: `<exhibit>.zip`, `<exhibit>.manifest.json` — the manifest carries the SHA-256 of the
 final archive, the per-file hashes, and one entry per source (there is no separate `.sha256` file).
 
 ## 3. Card
@@ -195,7 +197,7 @@ generated `.gitignore` (excludes `*.zip` and `*.log`) are written by the tools i
 git repo. Assembled by the orchestrator (see above):
 
 ```
-python tools/publish_exhibit.py ../<github_id>/<github_id>.yaml --out-dir <out-dir> --no-publish
+python tools/publish_exhibit.py ../<github_id>/<exhibit>.yaml --out-dir <out-dir> --no-publish
 ```
 
 `--no-publish` stops after the safe local steps (2–6, incl. the local showcase update) — no `gh`,
@@ -260,11 +262,17 @@ excluded) and ship the final archive as a release asset.
 
 ```
 gh repo create space-rangers-mods-museum/<github_id> --public --source <out-dir> --push
-gh release create v1.0.0 --title "<github_id>" <out-dir>/<github_id>.zip
+gh release create v1.0.0 --title "<exhibit>" --notes "<text>" <out-dir>/<exhibit>.zip
 ```
 
 `<out-dir>` is the local git repo built in steps 4–5. The release version is always `v1.0.0`; title —
-the `github_id`. After a successful release the local `<out-dir>/<github_id>.zip` is
+the mod's own name (`exhibit`), **never** the pack-suffixed `github_id`: the suffix names the
+repository, its folder and its archive *directory*, but not the release, which carries the mod's own
+name (`ExpRC__redux` → release title `ExpRC`). Every existing exhibit follows this. **`--notes` is not optional in practice:** without it, `gh release create` opens an
+interactive prompt for the title *and* the notes (`? Title (optional)`, then a `Release notes` menu)
+— which blocks a human's terminal and hangs a non-TTY run. Passing `--notes` (or `--notes-file`)
+makes the command fully non-interactive; `publish_exhibit.py` passes the fixed `RELEASE_NOTES`
+string. After a successful release the local `<out-dir>/<exhibit>.zip` is
 removed — the archive now lives only as the GitHub release asset.
 
 ## 8. Showcase — commit & push

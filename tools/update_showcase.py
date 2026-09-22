@@ -245,9 +245,9 @@ def main() -> None:
     # pack is published as `<mod>__<pack>` for every one of those editions. `--exhibit` names the
     # exhibit's museum folder — where its YAML and its card are read from.
     folder = exhibit
-    pack = pack_labels.pack_of_exhibit(folder, mod_id)
-    if pack_labels.github_id(mod_id, pack) != exhibit:
-        exhibit = pack_labels.github_id(mod_id, pack)
+    exhibit_pack = pack_labels.pack_of_exhibit(folder, mod_id)
+    if pack_labels.github_id(mod_id, exhibit_pack) != exhibit:
+        exhibit = pack_labels.github_id(mod_id, exhibit_pack)
         print(f"showcase: the folder is {folder!r}, the mod is published as {exhibit!r} — rename the folder to match")
     link = f"https://github.com/{args.org}/{exhibit}"
 
@@ -290,17 +290,17 @@ def main() -> None:
         if not row_mod_id:
             continue
         stored_id = row[i_gh].strip() or row_mod_id
-        pack = pack_labels.pack_for_exhibit(row_mod_id, stored_id)
-        if not pack:
+        row_pack = pack_labels.pack_for_exhibit(row_mod_id, stored_id)
+        if not row_pack:
             derived_ids.add(stored_id)
             continue
-        row_github_id = pack_labels.github_id(row_mod_id, pack)
+        row_github_id = pack_labels.github_id(row_mod_id, row_pack)
         derived_ids.add(row_github_id)
         if row_github_id != row[i_gh].strip():
             row[i_gh] = row_github_id
             row[i_link] = f"https://github.com/{args.org}/{row_github_id}"
         if i_note >= 0:
-            row[i_note] = merge_note(row[i_note], row_mod_id, row_github_id, pack)
+            row[i_note] = merge_note(row[i_note], row_mod_id, row_github_id, row_pack)
 
     # Append a new row if this exhibit is not yet catalogued. The key is the published id — matching
     # by the mod id would fuse the two editions of a duplicated mod into one row.
@@ -314,7 +314,7 @@ def main() -> None:
         row[i_gh] = exhibit
         row[i_link] = link
         if i_note >= 0:
-            row[i_note] = note_for(mod_id, exhibit, pack)
+            row[i_note] = note_for(mod_id, exhibit, exhibit_pack)
         rows.append(row)
         print(f"showcase: adding row {name!r} (mod id {mod_id}, github_id {exhibit})")
 
