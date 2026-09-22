@@ -28,6 +28,7 @@ The full step-by-step workflow and tooling are documented in [workflow.md](https
 | AMod_Spacejunk | Huk | [AMod_Spacejunk](https://github.com/space-rangers-mods-museum/AMod_Spacejunk) | 🥣 solyanka | На форме космоса добавляется панелька-смотрелка, показывающая какой предмет и где лежит в системе |
 | DenButtonsPack | denball | [DenButtonsPack](https://github.com/space-rangers-mods-museum/DenButtonsPack) | 🛰️ redux | Safe to use Adds button graphics that can be used in other mods |
 | DenSettingsControl | denball | [DenSettingsControl](https://github.com/space-rangers-mods-museum/DenSettingsControl) | 🛰️ redux | Safe to use Adds a panel for editing settings of game |
+| ExpBK | Huk, Klaxons | [ExpBK__redux](https://github.com/space-rangers-mods-museum/ExpBK__redux) | ⚠️ 🛰️ redux | Warning! Untranslated staff! Expands business center capabilities |
 | ExpPilotBridge | Huk, 100kg, Klaxons | [ExpPilotBridge__uni](https://github.com/space-rangers-mods-museum/ExpPilotBridge__uni) | ⚠️ 🪐 uni | Добавляет функциональный капитанский мостик всем кораблям в игре |
 | ExpRC | Huk, Klaxons | [ExpRC__redux](https://github.com/space-rangers-mods-museum/ExpRC__redux) | ⚠️ 🛰️ redux | Warning! Untranslated staff! Expands the capabilities of Ranger Centers |
 | ExpScienceRanks | Huk, 100kg, uhanich, Catarsys, Klaxons | [ExpScienceRanks__uni](https://github.com/space-rangers-mods-museum/ExpScienceRanks__uni) | ⚠️ 🪐 uni | Adds the ability to gain science titles and the unique Tick hull |
