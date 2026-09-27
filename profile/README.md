@@ -26,6 +26,7 @@ The full step-by-step workflow and tooling are documented in [workflow.md](https
 |-----|--------|---------|------|---------|
 | AMod_MapMarker | Huk | [AMod_MapMarker](https://github.com/space-rangers-mods-museum/AMod_MapMarker) | 🥣 solyanka | Добавляет возможность ставить метку на систему галакарты |
 | AMod_Spacejunk | Huk | [AMod_Spacejunk](https://github.com/space-rangers-mods-museum/AMod_Spacejunk) | 🥣 solyanka | На форме космоса добавляется панелька-смотрелка, показывающая какой предмет и где лежит в системе |
+| BlockTextQ | Klaxons, noname | [BlockTextQ__uni](https://github.com/space-rangers-mods-museum/BlockTextQ__uni) | ⚠️ 🪐 uni | Disables the issuance of text quests as government missions |
 | DenButtonsPack | denball | [DenButtonsPack](https://github.com/space-rangers-mods-museum/DenButtonsPack) | 🛰️ redux | Safe to use Adds button graphics that can be used in other mods |
 | DenSettingsControl | denball | [DenSettingsControl](https://github.com/space-rangers-mods-museum/DenSettingsControl) | 🛰️ redux | Safe to use Adds a panel for editing settings of game |
 | ExpBK | Huk, Klaxons | [ExpBK__redux](https://github.com/space-rangers-mods-museum/ExpBK__redux) | ⚠️ 🛰️ redux | Warning! Untranslated staff! Expands business center capabilities |
