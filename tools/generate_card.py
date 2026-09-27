@@ -45,6 +45,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 import zipfile
 from pathlib import Path
 
@@ -207,6 +208,15 @@ def render_card(exhibit: str, github_id: str, acquire_block: str, manifest: dict
 
 
 def main() -> None:
+    # Emit UTF-8 whenever the output is captured/redirected. A parent that reads this
+    # process through subprocess(..., text=True) decodes stdout as UTF-8; the progress
+    # lines carry non-ASCII (authors, the "·" separator) which the locale codec would
+    # otherwise encode as bytes UTF-8 cannot decode.
+    if not sys.stdout.isatty():
+        sys.stdout.reconfigure(encoding="utf-8")
+    if not sys.stderr.isatty():
+        sys.stderr.reconfigure(encoding="utf-8")
+
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--yaml", required=True, help="path to the exhibit YAML")
     parser.add_argument("--manifest", required=True, help="path to the exhibit .manifest.json")
