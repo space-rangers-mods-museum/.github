@@ -33,5 +33,6 @@ The full step-by-step workflow and tooling are documented in [workflow.md](workf
 | ExpRC | Huk, Klaxons | [ExpRC__redux](https://github.com/space-rangers-mods-museum/ExpRC__redux) | ⚠️ 🛰️ redux | Warning! Untranslated staff! Expands the capabilities of Ranger Centers |
 | ExpScienceRanks | Huk, 100kg, uhanich, Catarsys, Klaxons | [ExpScienceRanks__uni](https://github.com/space-rangers-mods-museum/ExpScienceRanks__uni) | ⚠️ 🪐 uni | Adds the ability to gain science titles and the unique Tick hull |
 | ExpSkills | Huk | [ExpSkills__redux](https://github.com/space-rangers-mods-museum/ExpSkills__redux) | ⚠️ 🛰️ redux | Warning! Untranslated staff! Extra skills |
+| ExpTC | Huk, Klaxons, 100kg, Ковбой Билл | [ExpTC__redux](https://github.com/space-rangers-mods-museum/ExpTC__redux) | ⚠️ 🛰️ redux | Warning! Untranslated staff! Adds a new base type - Technology Center and some new weapon akrins |
 | LEOGraphicsMod | LEOPARD | [LEOGraphicsMod](https://github.com/space-rangers-mods-museum/LEOGraphicsMod) | 🥣 solyanka | Содержит в себе всю графику и звук из "Солянки" и "AnotherMods" |
 | UtilityFunctionsPack | Klaxons, denball | [UtilityFunctionsPack__uni](https://github.com/space-rangers-mods-museum/UtilityFunctionsPack__uni) | ⚠️ 🪐 uni | Adds a set of useful modding features |
